@@ -15,7 +15,7 @@ func _run() -> void:
 	touch(0, joy, true)
 	drag(0, joy + Vector2(0, -60), Vector2(0, -60))
 	await frames(60)
-	check(player.global_position.z < z0 - 2.0, "joystick moves forward (moved %.2f)" % (z0 - player.global_position.z))
+	check(player.global_position.z < z0 - 0.8, "joystick moves forward (moved %.2f)" % (z0 - player.global_position.z))
 	check(not player.wants_run, "small push doesn't run")
 	var expected := player.walk_speed * 60.0 / controls.joystick_radius
 	check(absf(player.horizontal_speed() - expected) < 0.3, "analog walk speed ~%.2f (got %.2f)" % [expected, player.horizontal_speed()])

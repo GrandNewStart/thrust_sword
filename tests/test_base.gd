@@ -29,6 +29,9 @@ func _initialize() -> void:
 	rig = main.get_node("CameraRig")
 	controls = main.get_node("UI/TouchControls")
 	brain = main.get_node("DummyBrain")
+	brain.rng.seed = 20261110
+	player.rng.seed = 1
+	opponent.rng.seed = 2
 	manager = main.get_node("Session")
 	_run.call_deferred()
 	create_timer(90.0).timeout.connect(func(): print("TIMEOUT"); quit(2))
@@ -101,6 +104,15 @@ func mouse_move(relative: Vector2) -> void:
 	e.relative = relative
 	e.position = Vector2(640, 360)
 	vp.push_input(e, true)
+
+
+## Point the camera so the crosshair (screen centre) sits on `target`'s chest (aim mode).
+func aim_at(target: Node3D, height := 1.1) -> void:
+	for i in 5:
+		var to := target.global_position + Vector3.UP * height - rig.camera.global_position
+		rig.yaw = FighterCamera.yaw_towards(to)
+		rig.pitch = atan2(to.y, Vector2(to.x, to.z).length())
+		await frames(2)
 
 
 func tap(index: int, pos: Vector2) -> void:

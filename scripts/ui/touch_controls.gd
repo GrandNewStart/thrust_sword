@@ -9,7 +9,7 @@ extends Control
 ##     hold, release  = charged heavy attack
 ##     slow drag      = camera (a swipe undoes its own camera movement)
 ##   Buttons: GUARD (hold = block, tap just before a hit = parry), FIRE (secondary weapon),
-##            JUMP (hold in the air = vertical thrust).
+##            JUMP (press again in the air = vertical dash).
 ## Mouse input is emulated as touch on desktop (see project settings).
 
 ## Share of the screen height used by the thumb control zone.
@@ -37,7 +37,7 @@ extends Control
 ## Buttons, positioned from the bottom-right corner.
 var buttons := {
 	&"guard": { "offset": Vector2(100, 150), "radius": 70.0, "label": "GUARD" },
-	&"fire": { "offset": Vector2(100, 315), "radius": 56.0, "label": "FIRE" },
+	&"fire": { "offset": Vector2(100, 315), "radius": 56.0, "label": "AIM" },
 	&"jump": { "offset": Vector2(255, 85), "radius": 52.0, "label": "JUMP" },
 }
 ## Controls (e.g. HUD buttons) whose area this layer should ignore.
@@ -46,6 +46,11 @@ var exclusion_controls: Array[Control] = []
 enum Role { NONE, VIEW, JOYSTICK, PAD, BUTTON }
 
 var intent := PlayerIntent.new()
+## Set by the player controller. In aim mode the left stick moves the crosshair and the
+## attack pad is the trigger.
+var aiming := false
+## Buttons that are currently hidden (e.g. AIM for a sword without a gun).
+var hidden_buttons: Array[StringName] = []
 ## When false (menus, results screen) touches are ignored and nothing is drawn.
 var enabled := true:
 	set(v):
@@ -113,8 +118,18 @@ func _now() -> float:
 	return Time.get_ticks_msec() / 1000.0
 
 
+func set_button_visible(button: StringName, value: bool) -> void:
+	if value:
+		hidden_buttons.erase(button)
+	elif not hidden_buttons.has(button):
+		hidden_buttons.append(button)
+	queue_redraw()
+
+
 func _button_at(pos: Vector2) -> StringName:
 	for b in buttons:
+		if hidden_buttons.has(b):
+			continue
 		if pos.distance_to(button_center(b)) <= buttons[b].radius:
 			return b
 	return &""
@@ -149,6 +164,9 @@ func _on_press(index: int, pos: Vector2) -> void:
 			_joy_low_time = _now()
 	else:
 		f.role = Role.PAD
+		if aiming:
+			intent.fire_pressed = true
+			intent.fire_held = true
 
 	_fingers[index] = f
 	queue_redraw()
@@ -165,7 +183,9 @@ func _on_drag(index: int, pos: Vector2, relative: Vector2) -> void:
 		Role.JOYSTICK:
 			_update_joystick(pos)
 		Role.PAD:
-			if not f.charging and f.moved:
+			if aiming:
+				pass  # trigger finger: no camera drag
+			elif not f.charging and f.moved:
 				var d: Vector2 = relative * look_sensitivity
 				intent.look_delta += d
 				f.look_applied += d
@@ -187,6 +207,7 @@ func _on_release(index: int, pos: Vector2) -> void:
 			_joy_finger = -1
 			_joy_amount = 0.0
 			intent.move = Vector2.ZERO
+			intent.aim_stick = Vector2.ZERO
 			intent.run = false
 		Role.BUTTON:
 			_set_button(f.button, false)
@@ -194,6 +215,10 @@ func _on_release(index: int, pos: Vector2) -> void:
 			if not f.moved and age <= hold_time:
 				_register_tap(pos)
 		Role.PAD:
+			if aiming or intent.fire_held:
+				intent.fire_held = false
+				queue_redraw()
+				return
 			var swipe: Vector2 = pos - f.start
 			if f.charging:
 				_update_charge_flag()
@@ -211,7 +236,7 @@ func _process(delta: float) -> void:
 	var now := _now()
 	for index in _fingers:
 		var f: Dictionary = _fingers[index]
-		if f.role == Role.PAD and not f.charging and not f.moved and now - float(f.start_time) >= hold_time:
+		if f.role == Role.PAD and not aiming and not f.charging and not f.moved and now - float(f.start_time) >= hold_time:
 			f.charging = true
 			_update_charge_flag()
 	_dash_fx = maxf(0.0, _dash_fx - delta)
@@ -244,9 +269,8 @@ func _set_button(button: StringName, held: bool) -> void:
 			if held:
 				intent.jump_pressed = true
 		&"fire":
-			intent.fire_held = held
 			if held:
-				intent.fire_pressed = true
+				intent.aim_toggle = true
 
 
 func _is_button_held(button: StringName) -> bool:
@@ -256,7 +280,7 @@ func _is_button_held(button: StringName) -> bool:
 		&"jump":
 			return intent.jump_held
 		&"fire":
-			return intent.fire_held
+			return aiming
 	return false
 
 
@@ -285,11 +309,16 @@ func _update_joystick(pos: Vector2) -> void:
 	_detect_flick(amount, clamped)
 	_joy_amount = amount
 
-	if amount < joystick_deadzone:
-		intent.move = Vector2.ZERO
-	else:
+	var stick := Vector2.ZERO
+	if amount >= joystick_deadzone:
 		var v := clamped / joystick_radius
-		intent.move = Vector2(v.x, -v.y)  # screen up = forward
+		stick = Vector2(v.x, -v.y)  # screen up = forward / up
+	if aiming:
+		intent.aim_stick = stick
+		intent.move = Vector2.ZERO
+		intent.run = false
+		return
+	intent.move = stick
 	intent.run = amount >= run_threshold
 
 
@@ -334,8 +363,12 @@ func _draw() -> void:
 
 	# Attack pad hint
 	var hint_pos := Vector2(size.x * 0.5, top + 46)
-	draw_string(font, hint_pos, "TAP · SWIPE · HOLD", HORIZONTAL_ALIGNMENT_CENTER, size.x * 0.5, 20, Color(1, 1, 1, 0.22))
-	draw_string(font, hint_pos + Vector2(0, 26), "slow drag = camera", HORIZONTAL_ALIGNMENT_CENTER, size.x * 0.5, 16, Color(1, 1, 1, 0.15))
+	if aiming:
+		draw_string(font, hint_pos, "TAP / HOLD = FIRE", HORIZONTAL_ALIGNMENT_CENTER, size.x * 0.5, 20, Color(1, 0.8, 0.5, 0.5))
+		draw_string(font, hint_pos + Vector2(0, 26), "left stick = aim", HORIZONTAL_ALIGNMENT_CENTER, size.x * 0.5, 16, Color(1, 0.8, 0.5, 0.35))
+	else:
+		draw_string(font, hint_pos, "TAP · SWIPE · HOLD", HORIZONTAL_ALIGNMENT_CENTER, size.x * 0.5, 20, Color(1, 1, 1, 0.22))
+		draw_string(font, hint_pos + Vector2(0, 26), "slow drag = camera", HORIZONTAL_ALIGNMENT_CENTER, size.x * 0.5, 16, Color(1, 1, 1, 0.15))
 
 	# Charge ring under a held finger
 	var now := _now()
@@ -353,6 +386,8 @@ func _draw() -> void:
 
 	# Buttons
 	for b in buttons:
+		if hidden_buttons.has(b):
+			continue
 		var c := button_center(b)
 		var r: float = buttons[b].radius
 		var held := _is_button_held(b)

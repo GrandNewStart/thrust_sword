@@ -1,3 +1,4 @@
+class_name FighterVisual
 extends Node3D
 ## Look of a Fighter. Reads fighter state; never changes it.
 ## With the Mixamo character available (assets/mixamo/vanguard.glb), a CharacterAnimator animates
@@ -27,6 +28,23 @@ var _thruster_mat: StandardMaterial3D
 var _flash := 0.0
 var _flash_color := Color.WHITE
 var _glow_base_energy := 1.5
+## Lean angle (radians) into a thruster dash.
+const DASH_LEAN := 0.32
+## Charging: shoulders turn away from the target by up to this (radians), like loading a swing.
+const CHARGE_TWIST := 0.3
+## Attacks whose clip (a spear stab) holds the blade at the wrong angle for our sword:
+## the blade is re-aimed level at the target while they play. Firing gets the same treatment.
+const LEVELLED_ATTACKS: Array[StringName] = [&"light_3", &"thrust"]
+var _grip_rest := Transform3D.IDENTITY
+var _blade_aim := 0.0
+var _nozzle: Node3D
+var _tip: Node3D
+var _trail: SwordTrail
+var _charge_light: OmniLight3D
+var _charge_motes: CPUParticles3D
+var _flame_rest := Transform3D.IDENTITY
+var _prev_velocity := Vector3.ZERO
+var _smoothed_accel := Vector3.ZERO
 ## Own random stream: cosmetic jitter must not change gameplay / AI rolls.
 var _rng := RandomNumberGenerator.new()
 
@@ -48,6 +66,7 @@ func _ready() -> void:
 		var holder: Node3D = $SwordPivot/Sword
 		holder.reparent(_char.hand, false)
 		holder.transform = CharacterAnimator.grip_transform()
+		_grip_rest = holder.transform
 		var team_tint := Color.WHITE.lerp(fighter.body_color.lightened(0.35), 0.5)
 		_flash_mats = _char.tint(team_tint)
 		_set_sword_model(&"lancer")  # until a loadout picks one: never show the placeholder slab in hand
@@ -101,10 +120,35 @@ func _set_sword_model(id: StringName) -> void:
 		_thruster_mat = glow
 		_glow_base_energy = glow.emission_energy_multiplier
 
+	# Sword trail in the sword's glow color, from mid-blade to the tip.
+	_tip = model.find_child("Tip", true, false) as Node3D
+	if _trail == null:
+		_trail = SwordTrail.new()
+		add_child(_trail)
+	if glow:
+		_trail.color = glow.emission
+
+	# Charging: a light in the sword's colour and energy motes drawn into the blade.
+	if _charge_light == null:
+		_charge_light = OmniLight3D.new()
+		_charge_light.shadow_enabled = false
+		_charge_light.omni_range = 4.5
+		_charge_light.light_energy = 0.0
+		holder.add_child(_charge_light)
+		_charge_motes = _make_motes()
+		holder.add_child(_charge_motes)
+	var mid := holder.to_local(_tip.global_position) * 0.55 if _tip else Vector3(0, 1.2, 0)
+	_charge_light.position = mid
+	_charge_motes.position = mid
+	if glow:
+		_charge_light.light_color = glow.emission
+		_charge_motes.color = glow.emission
+
 	# Thruster flame comes out of the model's nozzle.
-	var nozzle := model.find_child("Nozzle", true, false) as Node3D
-	if nozzle:
-		_flame.position = model.transform * nozzle.position + Vector3(0, -0.5, 0)
+	_nozzle = model.find_child("Nozzle", true, false) as Node3D
+	if _nozzle:
+		_flame.position = model.transform * _nozzle.position + Vector3(0, -0.5, 0)
+	_flame_rest = _flame.transform
 
 
 func _on_got_hit(blocked: bool) -> void:
@@ -121,7 +165,153 @@ func _on_combat_event(text: String, _color: Color) -> void:
 func _process(delta: float) -> void:
 	if _char == null:
 		_update_placeholder_pose(delta)
+	else:
+		_update_lean(delta)
+		_update_blade_aim(delta)
 	_update_effects(delta)
+	_update_trail()
+	_update_charge_fx()
+
+
+func _make_motes() -> CPUParticles3D:
+	var p := CPUParticles3D.new()
+	p.emitting = false
+	p.amount = 28
+	p.lifetime = 0.45
+	p.local_coords = true  # follow the sword
+	p.emission_shape = CPUParticles3D.EMISSION_SHAPE_SPHERE_SURFACE
+	p.emission_sphere_radius = 0.9  # holder space is scaled; this is in sword units
+	p.gravity = Vector3.ZERO
+	p.radial_accel_min = -9.0
+	p.radial_accel_max = -6.0
+	p.initial_velocity_min = 0.0
+	p.initial_velocity_max = 0.3
+	var quad := QuadMesh.new()
+	quad.size = Vector2(0.07, 0.07)
+	quad.material = Fx._glow()
+	p.mesh = quad
+	p.color_ramp = Fx._fade_ramp()
+	p.cast_shadow = GeometryInstance3D.SHADOW_CASTING_SETTING_OFF
+	return p
+
+
+## Charge glow light (brightens, then pulses at full charge) + motes while charging.
+func _update_charge_fx() -> void:
+	if _charge_light == null:
+		return
+	var charging := fighter.state == Fighter.State.CHARGE
+	var r := fighter.charge_ratio() if charging else 0.0
+	var pulse := 0.0
+	if r >= 1.0:
+		pulse = 0.5 + 0.5 * sin(Time.get_ticks_msec() / 1000.0 * 14.0)
+	_charge_light.light_energy = (0.4 + 3.0 * r + 2.0 * pulse) if charging else 0.0
+	if _charge_motes.emitting != charging:
+		_charge_motes.emitting = charging
+
+
+## The sword's accent colour (its glow), for effects.
+func accent_color() -> Color:
+	return _trail.color if _trail else Color(0.4, 0.9, 1.0)
+
+
+## Where the blade tip is right now (falls back to in front of the fighter).
+func blade_tip_position() -> Vector3:
+	if _tip:
+		return _tip.global_position
+	return fighter.global_position + fighter.forward() * 2.0 + Vector3.UP
+
+
+## True while the thrust attack's lunge is being driven by the sword's thruster.
+func is_thrust_lunge() -> bool:
+	var a := fighter.current_attack
+	return fighter.state == Fighter.State.ATTACK and a != null and a.name == &"thrust" and fighter.attack_phase() <= 1
+
+
+## The trail draws while the blade is really moving: late windup through early recovery.
+## Big swings (slashes, smash, heavy) get a wider, brighter ribbon.
+func _update_trail() -> void:
+	if _trail == null or _tip == null:
+		return
+	var a := fighter.current_attack
+	var on := false
+	if fighter.state == Fighter.State.ATTACK and a:
+		var t := fighter.attack_time
+		on = t >= a.windup * 0.5 and t <= a.windup + a.active + a.recovery * 0.35
+	_trail.emitting = on
+	if on:
+		var big := a.name in [&"slash_left", &"slash_right", &"smash", &"heavy"]
+		_trail.intensity = 1.0 if big else 0.75
+		var tip := _tip.global_position
+		var grip := _holder.global_position
+		_trail.push(grip.lerp(tip, 0.18 if big else 0.35), tip)
+
+
+## Rotates the sword in the hands (around the grip) so the blade points level at where you
+## poke or shoot; blends in over the windup and back out during recovery.
+func _update_blade_aim(delta: float) -> void:
+	var want := 0.0
+	var aim := fighter.forward()
+	var a := fighter.current_attack
+	if fighter.state == Fighter.State.ATTACK and a and LEVELLED_ATTACKS.has(a.name):
+		var t := fighter.attack_time
+		if t < a.windup:
+			want = ease(t / a.windup, 0.6)
+		elif t < a.windup + a.active:
+			want = 1.0
+		else:
+			want = 1.0 - smoothstep(0.0, 1.0, (t - a.windup - a.active) / a.recovery)
+		_blade_aim = want  # follows the attack's own timing exactly
+		aim = (aim + Vector3.DOWN * 0.08).normalized()
+	else:
+		if fighter.state == Fighter.State.FREE and (fighter.aiming or fighter.since_shot < 0.3):
+			want = 1.0
+			var to_target := fighter.aim_point - _holder.global_position
+			if to_target.length() > 1.0:
+				aim = to_target.normalized()
+		_blade_aim = move_toward(_blade_aim, want, delta * 8.0)
+	if _blade_aim <= 0.001:
+		_holder.transform = _grip_rest
+		return
+	# Target: blade (+Y) along the aim, front edge (-Z) facing down.
+	var y := aim
+	var z := (Vector3.UP - y * y.dot(Vector3.UP)).normalized()
+	var target := Basis(y.cross(z).normalized(), y, z)
+	var hand_basis := _char.hand.global_basis.orthonormalized()
+	var local_target := Quaternion(hand_basis.inverse() * target)
+	var rest_rot := _grip_rest.basis.get_rotation_quaternion()
+	var rot := rest_rot.slerp(local_target.normalized(), _blade_aim)
+	_holder.transform = Transform3D(Basis(rot).scaled(_grip_rest.basis.get_scale()), _grip_rest.origin)
+
+
+## Lean into acceleration: forward when speeding up, back when braking, into the turn when
+## cornering. Small angles, smoothed — enough to read the body's weight shifting.
+func _update_lean(delta: float) -> void:
+	var v := Vector3(fighter.velocity.x, 0.0, fighter.velocity.z)
+	var a := (v - _prev_velocity) / maxf(delta, 0.001)
+	_prev_velocity = v
+	_smoothed_accel = _smoothed_accel.lerp(a, 1.0 - exp(-8.0 * delta))
+	var pitch := 0.0
+	var roll := 0.0
+	if fighter.state == Fighter.State.DASH:
+		# Dragged by the thrust: lean hard into the dash direction.
+		var d := fighter.global_basis.inverse() * fighter.dash_dir
+		pitch = d.z * DASH_LEAN
+		roll = -d.x * DASH_LEAN
+	elif fighter.is_on_floor() and fighter.state in [Fighter.State.FREE, Fighter.State.GUARD, Fighter.State.CHARGE]:
+		var local := fighter.global_basis.inverse() * _smoothed_accel
+		pitch = clampf(local.z * 0.010, -0.14, 0.14)  # accelerating forward (-Z) tips the top forward
+		roll = clampf(-local.x * 0.010, -0.12, 0.12)
+	var twist := 0.0
+	if fighter.state == Fighter.State.CHARGE:
+		var r := fighter.charge_ratio()
+		twist = -CHARGE_TWIST * smoothstep(0.0, 1.0, minf(r * 2.0, 1.0))  # right shoulder back
+		pitch += 0.05 * r  # settle back onto the rear leg
+		if r >= 1.0:  # fully charged: straining
+			twist += _rng.randf_range(-0.012, 0.012)
+	var k := 1.0 - exp(-(22.0 if fighter.state == Fighter.State.DASH else 10.0) * delta)
+	rotation.y = lerpf(rotation.y, twist, 1.0 - exp(-(30.0 if fighter.state == Fighter.State.ATTACK else 8.0) * delta))
+	rotation.x = lerpf(rotation.x, pitch, k)
+	rotation.z = lerpf(rotation.z, roll, k)
 
 
 ## Capsule mode: sword swings on a shoulder pivot, body leans when stunned / falls at K.O.
@@ -132,13 +322,11 @@ func _update_placeholder_pose(delta: float) -> void:
 
 	match fighter.state:
 		Fighter.State.FREE:
-			if fighter.thrusting_up:
-				target = POSE_THRUST_UP
-			elif fighter.since_shot < 0.3:
+			if fighter.since_shot < 0.3:
 				target = POSE_GUN
 				snap = fighter.since_shot < 0.05
 		Fighter.State.DASH:
-			target = _dash_pose()
+			target = POSE_THRUST_UP if fighter.is_vertical_dash() else _dash_pose()
 			snap = fighter.dash_time < 0.03
 		Fighter.State.GUARD:
 			target = POSE_GUARD
@@ -168,11 +356,14 @@ func _update_placeholder_pose(delta: float) -> void:
 func _update_effects(delta: float) -> void:
 	# Thruster glows while charging; flame while dashing / thrusting up.
 	var charge := fighter.charge_ratio() if fighter.state == Fighter.State.CHARGE else 0.0
-	var thrusting := fighter.is_thrusting()
+	var thrusting := fighter.is_thrusting() or is_thrust_lunge()
 	_thruster_mat.emission_energy_multiplier = _glow_base_energy * (1.0 + 5.0 * charge + (3.0 if thrusting else 0.0))
 	_flame.visible = thrusting
 	if thrusting:
+		_aim_flame()
 		_flame.scale = Vector3.ONE * _rng.randf_range(0.85, 1.15)
+
+
 
 	# Hit flash.
 	_flash = maxf(0.0, _flash - delta * 6.0)
@@ -198,3 +389,22 @@ func _attack_pose(a: AttackDef, t: float) -> Vector3:
 		return a.pose_start.lerp(a.pose_end, t / a.active)
 	t -= a.active
 	return a.pose_end.lerp(POSE_REST, smoothstep(0.0, 1.0, t / a.recovery))
+
+
+## The flame starts at the nozzle and always points away from where the thrust pushes you
+## (behind a dash, straight down when flying up), whatever angle the sword is at.
+func _aim_flame() -> void:
+	if _nozzle == null or _char == null:
+		_flame.transform = _flame_rest
+		return
+	var push := Vector3.UP
+	if fighter.state == Fighter.State.DASH:
+		push = fighter.dash_dir
+	elif is_thrust_lunge():
+		push = fighter.forward()
+	var y := push.normalized()  # flame mesh: wide end at +Y (nozzle), tip along -Y
+	var x := y.cross(Vector3.FORWARD if absf(y.dot(Vector3.FORWARD)) < 0.9 else Vector3.RIGHT).normalized()
+	var basis := Basis(x, y, x.cross(y).normalized())
+	var scale := _flame.global_basis.get_scale()
+	_flame.global_basis = basis.scaled(scale)
+	_flame.global_position = _nozzle.global_position - y * 0.5 * scale.y

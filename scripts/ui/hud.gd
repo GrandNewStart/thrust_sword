@@ -82,8 +82,12 @@ func _draw() -> void:
 	# Lock-on reticle + hint
 	var touch := InputMode.is_touch()
 	var hint := "Tap the opponent to lock on" if touch else "Tab / middle mouse: lock on"
+	var aiming := player != null and player.aiming
 	var hint_color := Color(1, 1, 1, 0.5)
-	if camera_rig and camera_rig.is_locked():
+	if aiming:
+		hint = "AIMING · stick = aim, pad = fire · AIM to exit" if touch else "AIMING · mouse = aim, LMB = fire · F to exit"
+		hint_color = Color(1, 0.8, 0.45, 0.9)
+	elif camera_rig and camera_rig.is_locked():
 		hint = "LOCKED · double-tap empty area to release" if touch else "LOCKED · Tab to release"
 		hint_color = Color(1, 0.6, 0.55, 0.8)
 		var cam := camera_rig.camera
@@ -114,6 +118,8 @@ func _draw() -> void:
 			draw_string_outline(font, s + Vector2(-150, 0), p.text, HORIZONTAL_ALIGNMENT_CENTER, 300, fs, 6, Color(0, 0, 0, c.a * 0.7))
 			draw_string(font, s + Vector2(-150, 0), p.text, HORIZONTAL_ALIGNMENT_CENTER, 300, fs, c)
 
+	if aiming:
+		_draw_crosshair()
 	_draw_banner(font)
 	var in_menu := session != null and session.phase in [SessionManager.Phase.SETUP, SessionManager.Phase.MATCH_END]
 	if not touch and not in_menu:
@@ -127,7 +133,7 @@ func _draw() -> void:
 const DESKTOP_HELP := [
 	"WASD move · Shift run · double-tap = dash",
 	"LMB light · LMB+flick slash · hold LMB charge",
-	"RMB guard / parry · Space jump & thrust · F fire",
+	"RMB guard / parry · Space jump (again in air: boost) · F aim mode",
 	"Tab lock-on · Esc menu",
 ]
 
@@ -137,6 +143,25 @@ func _draw_desktop_help(font: Font) -> void:
 	for line in DESKTOP_HELP:
 		draw_string(font, Vector2(20, y), line, HORIZONTAL_ALIGNMENT_LEFT, -1, 16, Color(1, 1, 1, 0.45))
 		y += 22.0
+
+
+## Screen-centre crosshair for aim mode. The ring shows the weapon's spread.
+func _draw_crosshair() -> void:
+	var c := size * 0.5
+	var col := Color(1, 1, 1, 0.9)
+	var shadow := Color(0, 0, 0, 0.5)
+	var gap := 7.0
+	var arm := 14.0
+	for d in [Vector2.RIGHT, Vector2.LEFT, Vector2.UP, Vector2.DOWN]:
+		draw_line(c + d * gap, c + d * (gap + arm), shadow, 5.0)
+		draw_line(c + d * gap, c + d * (gap + arm), col, 2.0)
+	draw_circle(c, 2.0, col)
+	if player and player.barrel.spread_deg > 0.0 and camera_rig:
+		# Spread cone radius on screen at this FOV.
+		var px := tan(deg_to_rad(player.barrel.spread_deg)) / tan(deg_to_rad(camera_rig.camera.fov * 0.5)) * size.y * 0.5
+		draw_arc(c, maxf(px, gap + 2.0), 0, TAU, 32, Color(1, 1, 1, 0.35), 1.5)
+	if player and player.ammo <= 0:
+		draw_string(ThemeDB.fallback_font, c + Vector2(-60, 46), "NO AMMO", HORIZONTAL_ALIGNMENT_CENTER, 120, 18, Color(1, 0.4, 0.3, 0.9))
 
 
 func _in_match() -> bool:

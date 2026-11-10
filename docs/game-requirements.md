@@ -65,8 +65,8 @@ The PoC opponent is an **AI**. Real player-vs-player (online) is the next phase 
 | Right pad: drag | Camera rotation (when not locked on) |
 | Guard: hold | Block |
 | Guard: tap just before a hit | Parry (only on swords that support it) |
-| Fire | Secondary attack (needs ammo) |
-| Jump 💡 | Jump. With fuel and a vertical-capable thruster: hold for vertical thrust. |
+| Aim toggle ✅ | **Manual aim mode** for the secondary weapon: position fixed, close-up over-the-shoulder camera, crosshair moved by hand (mouse / left stick), trigger = LMB / attack pad. No auto-aim or lock-on while aiming. Hidden for swords without a gun (Breaker). Jump, dash, guard or being hit exit it |
+| Jump ✅ | Jump (holding does nothing extra). Press again in the air with a flight-capable thruster: **vertical dash**, a one-time upward boost that uses fuel and shares the air-dash limit. |
 
 **Combos from mixed inputs:** e.g. swipe during a dash = dash-slash (only on thrusters that allow mid-dash attacks).
 Exact gesture thresholds (swipe length, hold time, flick speed) are to be tuned on a device.
@@ -91,7 +91,7 @@ Exact gesture thresholds (swipe length, hold time, flick speed) are to be tuned 
 | Block (per hit taken) | scales with hit power | – | – |
 | Parry attempt | low | – | – |
 | Thrust dash | low | ✔ | – |
-| Vertical thrust | low | ✔ (ongoing) | – |
+| Vertical dash (jump again in the air) | low | ✔ (once) | – |
 | Thrust-powered attack | medium | ✔ | – |
 | Secondary fire | – | – | ✔ |
 
@@ -102,7 +102,7 @@ stats and appearance. Each sword's behavior emerges from its components.
 | Component | Controls |
 |---|---|
 | **Blade** | Swing damage, speed, reach, block coverage (big blade = blocks almost anything; small = blocks only weak hits) |
-| **Thruster** | Dash distance/duration, vertical thrust, fuel efficiency, whether you can attack during or right after a dash |
+| **Thruster** | Dash distance/duration, vertical dash, fuel efficiency, whether you can attack during or right after a dash |
 | **Barrel** | Secondary attack type (none / machine gun / rocket / …), ammo capacity |
 | **Guard / Core** | Parry support, parry window, stamina efficiency |
 
@@ -115,7 +115,7 @@ Rules:
 No customization screen in the PoC. Instead, three ready-made swords:
 | Preset | Blade | Thruster | Barrel | Parry |
 |---|---|---|---|---|
-| **Striker** (mobility) | Light, fast, small block coverage | Long dashes, vertical thrust, attack mid-dash | Machine gun, low damage | ✔ |
+| **Striker** (mobility) | Light, fast, small block coverage | Long dashes, strong vertical dash, attack mid-dash | Machine gun, low damage | ✔ |
 | **Breaker** (power) | Huge, slow, blocks almost anything, guard-breaking heavy | Short dashes | None | ✘ |
 | **Lancer** (balanced/ranged) | Medium | Medium, attack right after dash | Rocket, high damage, few shots | ✔ |
 

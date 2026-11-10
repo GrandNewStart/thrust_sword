@@ -19,7 +19,7 @@ func _run() -> void:
 	var z0 := player.global_position.z
 	key(KEY_W, true)
 	await frames(40)
-	check(z0 - player.global_position.z > 2.5 and absf(player.horizontal_speed() - player.walk_speed) < 0.3, "W walks forward (%.1f m/s)" % player.horizontal_speed())
+	check(z0 - player.global_position.z > 0.9 and absf(player.horizontal_speed() - player.walk_speed) < 0.3, "W walks forward (%.1f m/s)" % player.horizontal_speed())
 	key(KEY_SHIFT, true)
 	await frames(30)
 	check(player.is_running() and absf(player.horizontal_speed() - player.run_speed) < 0.3, "Shift runs (%.1f m/s)" % player.horizontal_speed())
@@ -94,7 +94,7 @@ func _run() -> void:
 	check(player.state == Fighter.State.GUARD and is_equal_approx(player.health, 98.8), "RMB held = block (health %.1f)" % player.health)
 	mouse_button(MOUSE_BUTTON_RIGHT, false)
 
-	# --- Space jump / thrust ---
+	# --- Space: jump, then Space again in the air = vertical dash ---
 	await _face_off(10.0)
 	key(KEY_SPACE, true)
 	var top := 0.0
@@ -102,7 +102,13 @@ func _run() -> void:
 		await frames(1)
 		top = maxf(top, player.global_position.y)
 	key(KEY_SPACE, false)
-	check(top > 4.0 and player.fuel < 100.0, "hold Space = jump + thrust (%.1f m)" % top)
+	check(top < 1.9 and is_equal_approx(player.fuel, 100.0), "hold Space = plain jump (%.1f m)" % top)
+	await _face_off(10.0)
+	key_tap(KEY_SPACE)
+	await frames(15)
+	key_tap(KEY_SPACE)
+	await frames(2)
+	check(player.is_vertical_dash() and player.fuel < 100.0, "Space again in the air = vertical dash")
 
 	# --- Dashes ---
 	await _face_off(10.0)
@@ -118,12 +124,20 @@ func _run() -> void:
 	key(KEY_D, false)
 	check(player.state == Fighter.State.DASH and player.dash_dir.x > 0.9, "C = dash toward movement (D = right)")
 
-	# --- Fire ---
+	# --- F toggles aim mode; LMB is the trigger while aiming ---
 	await _face_off(8.0)
-	key(KEY_F, true)
+	key_tap(KEY_F)
+	await frames(30)
+	check(player.aiming and desktop.aiming, "F enters aim mode")
+	await aim_at(opponent)
+	mouse_button(MOUSE_BUTTON_LEFT, true)
 	await frames(40)
-	key(KEY_F, false)
-	check(player.ammo < 60, "F fires (ammo %d)" % player.ammo)
+	mouse_button(MOUSE_BUTTON_LEFT, false)
+	await frames(10)
+	check(player.ammo < 60 and opponent.health < 100.0 and player.current_attack == null, "LMB fires in aim mode, no sword attack (ammo %d)" % player.ammo)
+	key_tap(KEY_F)
+	await frames(3)
+	check(not player.aiming, "F again leaves aim mode")
 
 	# --- Esc menu ---
 	manager.mode = SessionManager.Mode.TRAINING
@@ -146,6 +160,7 @@ func _face_off(dist: float) -> void:
 	for k in [KEY_W, KEY_A, KEY_S, KEY_D, KEY_SHIFT, KEY_SPACE, KEY_F]:
 		key(k, false)
 	manager.reset_fighters()
+	player.set_aiming(false)
 	player.barrel = BarrelDef.machine_gun()
 	player.reset_to(Vector3(0, 0, 20 + dist), 0.0)
 	opponent.reset_to(Vector3(0, 0, 20), PI)

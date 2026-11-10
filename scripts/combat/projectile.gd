@@ -35,6 +35,7 @@ func _build_mesh() -> void:
 		mi.mesh = m
 		mi.rotation_degrees.x = 90  # capsule axis along flight direction
 		mat.albedo_color = Color(1.0, 0.5, 0.15)
+		Fx.smoke_trail(self)
 	else:
 		var m := BoxMesh.new()
 		m.size = Vector3(0.05, 0.05, 0.9)
@@ -63,6 +64,8 @@ func _physics_process(delta: float) -> void:
 
 	var point: Vector3 = hit.position
 	var target := hit.collider as Fighter
+	if target == null and barrel.splash_radius <= 0.0:
+		get_tree().call_group("fx", "bullet_impact", point, hit.normal)
 	if barrel.splash_radius > 0.0:
 		_explode(point, target)
 	elif target and is_instance_valid(shooter):
@@ -84,6 +87,7 @@ func _explode(point: Vector3, direct: Fighter) -> void:
 		if is_instance_valid(shooter):
 			f.receive_projectile(shooter, barrel, barrel.damage * falloff, point)
 	Explosion.spawn(get_parent(), point, barrel.splash_radius)
+	get_tree().call_group("fx", "explosion", point, barrel.splash_radius)
 
 
 class Explosion:

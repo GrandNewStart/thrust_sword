@@ -8,7 +8,7 @@ enum DashAttack {
 	DURING,  ## attacks can start mid-dash, carrying its momentum
 }
 
-@export var dash_speed := 20.0
+@export var dash_speed := 14.0
 @export var dash_duration := 0.22
 @export var dash_fuel := 12.0
 @export var dash_stamina := 8.0
@@ -20,9 +20,11 @@ enum DashAttack {
 
 @export var vertical := true
 ## Upward acceleration on top of cancelling gravity.
-@export var vertical_accel := 14.0
-@export var vertical_max_speed := 7.0
-@export var vertical_fuel_per_sec := 25.0
+## Vertical dash: press jump again while airborne for a one-time upward boost.
+## Shares the air-dash limit with horizontal air dashes.
+@export var vertical_dash_speed := 10.0
+@export var vertical_dash_duration := 0.22
+@export var vertical_dash_fuel := 12.0
 
 
 static func standard() -> ThrusterDef:

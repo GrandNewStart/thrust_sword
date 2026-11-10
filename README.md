@@ -21,6 +21,11 @@ godot --headless --path . -s tests/test_step3.gd   # thrust / fuel / secondary f
 godot --headless --path . -s tests/test_step4.gd   # swords / armor / AI test
 godot --headless --path . -s tests/test_step5.gd   # match loop test
 godot --headless --path . -s tests/test_desktop.gd # keyboard + mouse test
+godot --headless --path . -s tests/test_movement.gd # movement feel (inertia, armor weight)
+godot --headless --path . -s tests/test_combo.gd   # light attack chain
+godot --headless --path . -s tests/test_aim.gd     # manual aim mode
+godot --headless --path . -s tests/test_fx.gd      # effects wiring
+godot --path . -s tests/screenshot_fx.gd -- out.png # render effect moments
 tools/ios_deploy.sh                                # build + install on a connected iPhone
 tools/macos_build.sh                               # build build/macos/ThrustSword.app and launch it
 godot --path . -- --touch                          # run the touch layout on desktop (mouse = finger)
@@ -34,11 +39,11 @@ Desktop (macOS) — same actions, same gesture logic as touch:
 |---|---|
 | WASD · Shift | move · run |
 | double-tap WASD · C | thrust dash (that direction · movement direction) |
-| Space (hold in the air) | jump (vertical thrust) |
+| Space · Space again in the air | jump · vertical dash (one-time boost, uses fuel) |
 | Mouse | camera (when not locked on) |
-| LMB click · LMB + quick flick · hold LMB | light · directional slash (←/→ slash, ↑ thrust, ↓ smash) · charged heavy |
+| LMB click · LMB + quick flick · hold LMB | light chain (swing left → swing right → poke) · directional slash (←/→ slash, ↑ thrust, ↓ smash) · charged heavy |
 | RMB hold · RMB tap before a hit | guard · parry |
-| F | fire secondary weapon |
+| F | toggle **aim mode** (swords with a gun): planted, close-up over-the-shoulder view, mouse moves the crosshair, LMB fires (hold for the machine gun). No auto-aim. Jump / dash / guard / getting hit leave it |
 | Tab / middle mouse | lock on / release |
 | Esc | setup menu |
 
@@ -46,19 +51,13 @@ Touch (phone):
 
 | Touch | Action |
 |---|---|
-| Bottom-left: drag joystick to move, push to edge to run | WASD, Shift to run |
-| Bottom-right: drag to rotate camera | drag with mouse |
-| JUMP button | Space |
-| Attack pad tap: light attack (tap again during recovery to combo) | J |
-| Attack pad swipe ← / →: horizontal slashes | Left / Right arrows |
-| Attack pad swipe ↑: lunging thrust · swipe ↓: overhead smash | Up / Down arrows |
-| Attack pad hold, then release: charged heavy (full charge breaks guard) | hold K |
-| GUARD hold: block · tap just before a hit: parry | hold L |
-| Joystick double-flick: thrust dash (fuel). Attack during a dash = boosted dash attack | C (dash toward move direction) |
-| JUMP hold in the air: vertical thrust (fuel) | hold Space |
-| FIRE: secondary weapon (machine gun: hold · rocket: one per press) | F |
-| Tap opponent: lock on | Tab toggles lock |
-| Double-tap empty area: release lock | Tab |
+| Bottom-left joystick | move · push to the edge to run · double-flick = thrust dash |
+| Bottom-right drag | camera |
+| Attack pad: tap · swipe ←/→/↑/↓ · hold, release | light chain (swing left → swing right → poke) · slash / thrust / smash · charged heavy |
+| GUARD hold · tap just before a hit | block · parry |
+| JUMP · JUMP again in the air | jump · vertical dash (one-time boost, uses fuel) |
+| AIM (not shown for Breaker) | toggle **aim mode**: left stick moves the crosshair, attack pad fires (hold for the machine gun) |
+| Tap opponent · double-tap empty area | lock on · release |
 
 Orange canisters = fuel packs (+50 fuel), cyan boxes = ammo packs (+50% ammo). Both respawn after 15 s.
 Fuel never regenerates on its own.
@@ -96,6 +95,9 @@ scripts/fighter/   Fighter — movement, attacks, guard/parry, health/stamina; F
 scripts/camera/    FighterCamera — behind-the-back camera, lock-on
 scripts/player/    PlayerController — connects input to fighter + camera
 scripts/world/     Arena (generated in code), Pickup (fuel / ammo packs)
+scripts/fx/        FxDirector (gameplay events -> effects), Fx (sparks, flares, lights, dust),
+                   SwordTrail, ScreenFx (motion blur, aberration, damage vignette); camera shake
+                   lives in FighterCamera
 tests/             automated tests and screenshot tool
 ```
 
@@ -103,13 +105,15 @@ tests/             automated tests and screenshot tool
 | Asset | Source | How it's built |
 |---|---|---|
 | Swords (`assets/swords/*.glb`) | Our own | `Blender -b -P tools/blender/build_swords.py -- assets/swords` |
-| Character (`assets/mixamo/vanguard.glb`) | Mixamo "Vanguard" + great-sword animations | `Blender -b -P tools/blender/build_character.py -- assets/mixamo/source assets/mixamo/vanguard.glb assets/mixamo/anim_info.json` |
+| Character (`assets/mixamo/vanguard.glb`) | Mixamo "Vanguard" + great-sword animations (upper body, attacks) + walk/jog/run sets `legs_*` (legs) | `Blender -b -P tools/blender/build_character.py -- assets/mixamo/source assets/mixamo/vanguard.glb assets/mixamo/anim_info.json` |
 
 (`Blender` = `/Applications/Blender.app/Contents/MacOS/Blender`)
 
 - **Mixamo files are git-ignored** (free to use in the game, not to redistribute). Raw downloads live in
   `assets/mixamo/source/` (ignored by Godot too); only the merged `vanguard.glb` ships in the app.
   Without them the game still runs, falling back to placeholder capsule fighters.
+- The body is animated in two layers split at the spine: legs from natural walk/jog/run clips matched
+  to ground speed, upper body from great-sword clips. Guard / charge / firing use the upper body only.
 - `scripts/fighter/character_animator.gd` maps fighter states to clips. Attacks are scrubbed, not played,
   so each swing's fastest point lines up with the game's hit window (`ATTACK_CLIPS` table).
 - Preview tools: `tests/screenshot_anims.gd` (contact sheet of every state), `tests/screenshot_swords.gd`.

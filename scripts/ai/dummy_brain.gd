@@ -28,6 +28,9 @@ enum Mode { IDLE, BLOCK, ATTACK, SPAR }
 ## Average seconds between attack attempts in neutral.
 @export var attack_tempo := 1.6
 
+## Own random stream, so nothing else (particles, cosmetic jitter) changes the AI's choices.
+## Tests seed it for repeatable fights.
+var rng := RandomNumberGenerator.new()
 var _cooldown := 1.0
 var _charging := 0.0
 var _burst := 0.0
@@ -53,6 +56,10 @@ func _ready() -> void:
 		fighter.got_hit.connect(func(blocked: bool): _was_hit = not blocked)
 
 
+func _pick(options: Array) -> Variant:
+	return options[rng.randi_range(0, options.size() - 1)]
+
+
 static func mode_name(m: Mode) -> String:
 	return ["IDLE", "BLOCK", "ATTACK", "SPAR"][m]
 
@@ -65,7 +72,6 @@ func _physics_process(delta: float) -> void:
 	fighter.guard_input = false
 	fighter.charge_input = false
 	fighter.fire_input = false
-	fighter.thrust_input = false
 	fighter.aim_point = target.global_position + Vector3.UP
 	if not fighter.is_alive() or not target.is_alive():
 		return
@@ -93,11 +99,11 @@ func _attack_mode(to: Vector3, delta: float) -> void:
 		fighter.move_input = Vector2(dir.x, dir.z)
 		fighter.wants_run = dist > 8.0
 		# Close distance with a dash now and then; shoot a burst at range.
-		if dist > 7.0 and fighter.fuel > 30.0 and randf() < delta * 0.6:
+		if dist > 7.0 and fighter.fuel > 30.0 and rng.randf() < delta * 0.6:
 			fighter.request_dash(Vector2(dir.x, dir.z))
 		if dist > 6.0 and fighter.ammo > 0:
 			_burst = maxf(_burst, 0.0)
-			if _burst <= 0.0 and randf() < delta * 0.4:
+			if _burst <= 0.0 and rng.randf() < delta * 0.4:
 				_burst = 0.6
 				fighter.request_fire()
 	if _burst > 0.0:
@@ -111,12 +117,12 @@ func _attack_mode(to: Vector3, delta: float) -> void:
 
 	_cooldown -= delta
 	if _cooldown <= 0.0 and dist <= attack_range + 0.4 and fighter.state == Fighter.State.FREE:
-		_cooldown = randf_range(attack_interval.x, attack_interval.y)
-		if randf() < 0.15:
-			_charging = randf_range(0.5, 1.1)  # charged heavy
+		_cooldown = rng.randf_range(attack_interval.x, attack_interval.y)
+		if rng.randf() < 0.15:
+			_charging = rng.randf_range(0.5, 1.1)  # charged heavy
 			fighter.charge_input = true
 		else:
-			fighter.request_attack(ATTACKS.pick_random())
+			fighter.request_attack(_pick(ATTACKS))
 
 
 # ---------------------------------------------------------------- SPAR mode
@@ -136,20 +142,20 @@ func _spar(to: Vector3, delta: float) -> void:
 			_execute_plan(dir, side)
 
 	# Incoming fire: sometimes raise guard.
-	if foe.since_shot < 0.1 and dist > 4.0 and _guard_hold <= 0.0 and randf() < guard_chance * 0.15:
+	if foe.since_shot < 0.1 and dist > 4.0 and _guard_hold <= 0.0 and rng.randf() < guard_chance * 0.15:
 		_guard_hold = 0.5
 
 	# Got hit: once able to act again, often turtle up to break the combo.
 	if _was_hit and me.state == Fighter.State.FREE:
 		_was_hit = false
-		if randf() < guard_chance + 0.2:
-			_guard_hold = randf_range(0.4, 0.8)
+		if rng.randf() < guard_chance + 0.2:
+			_guard_hold = rng.randf_range(0.4, 0.8)
 
 	# Standing in the foe's range: fast attacks can't be reacted to, so anticipate.
 	var foe_reach: float = foe.moveset[&"light"].reach + 0.6
 	if dist <= foe_reach and me.state == Fighter.State.FREE and _guard_hold <= 0.0 \
-			and randf() < delta * 2.0 * guard_chance:
-		_guard_hold = randf_range(0.35, 0.7)
+			and rng.randf() < delta * 2.0 * guard_chance:
+		_guard_hold = rng.randf_range(0.35, 0.7)
 
 	if _guard_hold > 0.0:
 		_guard_hold -= delta
@@ -168,14 +174,14 @@ func _spar(to: Vector3, delta: float) -> void:
 
 	# 2. Combos: keep pressing while the current attack is in recovery.
 	if _combo_left > 0 and me.state == Fighter.State.ATTACK and me.attack_phase() == 2:
-		me.request_attack([&"light", &"slash_left", &"slash_right"].pick_random())
+		me.request_attack(_pick([&"light", &"slash_left", &"slash_right"]))
 		_combo_left -= 1
 
 	# Dash attack: attack shortly after a dash starts.
 	if _dash_attack_pending > 0.0:
 		_dash_attack_pending -= delta
 		if me.state == Fighter.State.DASH and _dash_attack_pending <= 0.0:
-			me.request_attack([&"light", &"thrust"].pick_random())
+			me.request_attack(_pick([&"light", &"thrust"]))
 
 	if me.state != Fighter.State.FREE:
 		return
@@ -186,8 +192,8 @@ func _spar(to: Vector3, delta: float) -> void:
 	var foe_open := foe.state == Fighter.State.STAGGER or foe.attack_phase() == 2
 	if foe_open and dist <= reach + 0.8 and me.stamina > 15.0:
 		var stunned := foe.state == Fighter.State.STAGGER
-		me.request_attack(&"smash" if stunned and randf() < 0.4 else &"light")
-		_combo_left = randi_range(0, 2) if stunned else 0
+		me.request_attack(&"smash" if stunned and rng.randf() < 0.4 else &"light")
+		_combo_left = rng.randi_range(0, 2) if stunned else 0
 		return
 
 	# 4. Out of breath: back off and recover.
@@ -211,13 +217,13 @@ func _spar(to: Vector3, delta: float) -> void:
 	# 6. Neutral: close in / keep spacing and circle, poke with the gun, look for an opening.
 	_strafe_switch -= delta
 	if _strafe_switch <= 0.0:
-		_strafe_switch = randf_range(1.2, 3.0)
+		_strafe_switch = rng.randf_range(1.2, 3.0)
 		_strafe_sign = -_strafe_sign
 
 	if dist > 12.0:
 		me.move_input = _flat(dir)
 		me.wants_run = true
-		if me.fuel > 40.0 and randf() < delta * 0.5:
+		if me.fuel > 40.0 and rng.randf() < delta * 0.5:
 			me.request_dash(_flat(dir))
 	elif dist > preferred_range + 1.0:
 		me.move_input = _flat(dir * 0.8 + side * 0.4)
@@ -228,18 +234,18 @@ func _spar(to: Vector3, delta: float) -> void:
 
 	if me.barrel.has_gun() and me.ammo > 0 and dist > 6.0:
 		if me.barrel.automatic:
-			if _burst <= 0.0 and randf() < delta * 0.5:
+			if _burst <= 0.0 and rng.randf() < delta * 0.5:
 				_burst = 0.5
 			if _burst > 0.0:
 				_burst -= delta
 				me.fire_input = true
-		elif randf() < delta * 0.35:
+		elif rng.randf() < delta * 0.35:
 			me.request_fire()
 
 	_cooldown -= delta
 	if _cooldown > 0.0 or me.stamina < 40.0:
 		return
-	_cooldown = randf_range(attack_tempo * 0.6, attack_tempo * 1.4)
+	_cooldown = rng.randf_range(attack_tempo * 0.6, attack_tempo * 1.4)
 	_start_offense(dist, reach, dir)
 
 
@@ -247,12 +253,12 @@ func _start_offense(dist: float, reach: float, dir: Vector3) -> void:
 	var me := fighter
 	var dash_attack_ok := me.thruster.dash_attack != ThrusterDef.DashAttack.NONE
 	if dist <= reach + 0.2:
-		if randf() < 0.2:
-			_charging = randf_range(0.4, 1.0)
+		if rng.randf() < 0.2:
+			_charging = rng.randf_range(0.4, 1.0)
 			me.charge_input = true
 		else:
-			me.request_attack([&"light", &"light", &"slash_left", &"slash_right", &"smash"].pick_random())
-			_combo_left = randi_range(0, 2)
+			me.request_attack(_pick([&"light", &"light", &"slash_left", &"slash_right", &"smash"]))
+			_combo_left = rng.randi_range(0, 2)
 	elif dist <= 7.0 and dash_attack_ok and me.fuel > 15.0:
 		me.request_dash(_flat(dir))
 		_dash_attack_pending = 0.06
@@ -275,8 +281,8 @@ func _watch_attacks(dist: float) -> void:
 	var lunge := a.lunge_speed * (a.windup + a.active)
 	if dist > a.reach + lunge + 1.0:
 		return  # not a threat
-	_react_in = reaction_time * randf_range(0.8, 1.3)
-	var roll := randf()
+	_react_in = reaction_time * rng.randf_range(0.8, 1.3)
+	var roll := rng.randf()
 	if fighter.can_parry and roll < parry_chance:
 		_plan = &"parry"
 	elif roll < parry_chance + guard_chance:

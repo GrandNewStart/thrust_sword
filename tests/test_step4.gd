@@ -11,13 +11,15 @@ func _run() -> void:
 
 	# --- Presets change stats ---
 	player.apply_loadout(SwordDef.striker(), ArmorDef.by_id(&"light"))
-	check(is_equal_approx(player.max_health, 85.0) and player.walk_speed > 5.5, "light armor: less HP, faster (%.0f HP, %.2f m/s)" % [player.max_health, player.walk_speed])
+	var light_run := player.run_speed
+	check(is_equal_approx(player.max_health, 85.0) and light_run > ArmorDef.by_id(&"medium").run_speed, "light armor: less HP, faster (%.0f HP, run %.1f m/s)" % [player.max_health, light_run])
 	check(player.barrel.kind == BarrelDef.Kind.MACHINE_GUN and player.thruster.vertical, "striker: machine gun + flight")
-	check(player.moveset[&"light"].windup < 0.12 and player.moveset[&"light"].damage < 8.0, "striker: faster, lighter swings")
+	var base_light: AttackDef = Movesets.standard()[&"light"]
+	check(player.moveset[&"light"].windup < base_light.windup and player.moveset[&"light"].damage < base_light.damage, "striker: faster, lighter swings than the baseline")
 	player.apply_loadout(SwordDef.breaker(), ArmorDef.by_id(&"heavy"))
 	check(not player.barrel.has_gun() and player.ammo == 0 and not player.can_parry, "breaker: no gun, no parry")
 	check(player.moveset[&"smash"].guard_break and player.moveset[&"heavy"].guard_break, "breaker: smash + heavy break guard")
-	check(is_equal_approx(player.max_health, 140.0) and player.walk_speed < 4.5, "heavy armor: more HP, slower")
+	check(is_equal_approx(player.max_health, 140.0) and player.run_speed < light_run * 0.7 and player.acceleration < 6.0, "heavy armor: more HP, much slower and heavier (run %.1f m/s)" % player.run_speed)
 	player.apply_loadout(SwordDef.lancer(), ArmorDef.by_id(&"medium"))
 	check(player.barrel.kind == BarrelDef.Kind.ROCKET and player.thruster.dash_attack == ThrusterDef.DashAttack.AFTER, "lancer: rockets + attack-after-dash")
 

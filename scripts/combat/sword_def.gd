@@ -83,16 +83,15 @@ static func striker() -> SwordDef:
 	s.can_parry = true
 	s.parry_window = 0.22
 	var t := ThrusterDef.new()
-	t.dash_speed = 24.0
+	t.dash_speed = 16.8
 	t.dash_duration = 0.26
 	t.dash_fuel = 9.0
 	t.dash_cooldown = 0.15
 	t.air_dash_limit = 3
 	t.dash_attack = ThrusterDef.DashAttack.DURING
 	t.vertical = true
-	t.vertical_accel = 16.0
-	t.vertical_max_speed = 8.0
-	t.vertical_fuel_per_sec = 20.0
+	t.vertical_dash_speed = 12.0
+	t.vertical_dash_fuel = 9.0
 	s.thruster = t
 	s.barrel = BarrelDef.machine_gun()
 	return s
@@ -117,7 +116,7 @@ static func breaker() -> SwordDef:
 	s.blade_color = Color(0.55, 0.57, 0.62)
 	s.can_parry = false
 	var t := ThrusterDef.new()
-	t.dash_speed = 17.0
+	t.dash_speed = 11.9
 	t.dash_duration = 0.16
 	t.dash_fuel = 14.0
 	t.dash_cooldown = 0.3
@@ -142,7 +141,6 @@ static func lancer() -> SwordDef:
 	s.parry_window = 0.2
 	var t := ThrusterDef.new()
 	t.dash_attack = ThrusterDef.DashAttack.AFTER
-	t.vertical_accel = 12.0
 	s.thruster = t
 	s.barrel = BarrelDef.rocket()
 	return s

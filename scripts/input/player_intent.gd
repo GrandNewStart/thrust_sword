@@ -9,8 +9,13 @@ var run := false
 var jump_pressed := false  # one-shot, cleared when consumed
 var jump_held := false
 var guard_held := false
+## Firing (only while in aim mode).
 var fire_held := false
 var fire_pressed := false  # one-shot, so a very quick tap still fires
+## Toggle the manual aim mode (one-shot).
+var aim_toggle := false
+## Aim mode on touch: the left stick moves the crosshair (x = right, y = up). Length 0..1.
+var aim_stick := Vector2.ZERO
 ## Dashes requested since last read: directions in stick space (x = right, y = forward).
 var dashes: Array[Vector2] = []
 ## True while the attack pad is held still long enough to charge a heavy attack.
@@ -29,6 +34,7 @@ func clear_one_shots() -> void:
 	jump_pressed = false
 	lock_toggle = false
 	fire_pressed = false
+	aim_toggle = false
 	look_delta = Vector2.ZERO
 	taps.clear()
 	attacks.clear()

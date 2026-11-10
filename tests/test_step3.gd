@@ -64,7 +64,7 @@ func _run() -> void:
 	check(player.state == Fighter.State.ATTACK, "AFTER thruster: attack fires as dash ends")
 	player.thruster.dash_attack = ThrusterDef.DashAttack.DURING
 
-	# --- Vertical thrust: hold jump ---
+	# --- Holding jump is just a jump (no hovering) ---
 	await _face_off(8.0)
 	var jump_btn := controls.button_center(&"jump")
 	touch(2, jump_btn, true)
@@ -73,8 +73,37 @@ func _run() -> void:
 		await frames(1)
 		top = maxf(top, player.global_position.y)
 	touch(2, jump_btn, false)
-	check(top > 4.0, "hold jump = thrust higher than a jump (%.1f m)" % top)
-	check(player.fuel < 100.0, "thrust burns fuel (%.1f)" % player.fuel)
+	check(top < 1.9 and is_equal_approx(player.fuel, 100.0), "holding jump = one plain jump, no fuel (%.1f m)" % top)
+
+	# --- Second press in the air = one vertical dash ---
+	await _face_off(8.0)
+	tap(2, jump_btn)
+	await frames(15)
+	var fuel_before := player.fuel
+	tap(2, jump_btn)
+	await frames(2)
+	check(player.is_vertical_dash(), "jump again in the air = vertical dash")
+	check(is_equal_approx(player.fuel, fuel_before - player.thruster.vertical_dash_fuel), "vertical dash costs fuel once (%.1f)" % player.fuel)
+	top = 0.0
+	for i in 70:
+		await frames(1)
+		top = maxf(top, player.global_position.y)
+	check(top > 2.5, "boost goes well above a jump (%.1f m)" % top)
+	check(is_equal_approx(player.fuel, fuel_before - player.thruster.vertical_dash_fuel), "one-time boost, not continuous (fuel %.1f)" % player.fuel)
+
+	# --- Air dash limit is shared with vertical dashes ---
+	await _face_off(8.0)
+	tap(2, jump_btn)
+	await frames(10)
+	var boosts := 0
+	for i in 4:
+		tap(2, jump_btn)
+		await frames(2)
+		if player.is_vertical_dash():
+			boosts += 1
+		await frames(30)  # past the dash + its cooldown
+	check(boosts == player.thruster.air_dash_limit, "boosts per airtime = air-dash limit (%d)" % boosts)
+	await frames(120)
 
 	# --- Tap jump stays a normal jump ---
 	await _face_off(8.0)
@@ -87,14 +116,16 @@ func _run() -> void:
 		top = maxf(top, player.global_position.y)
 	check(top < 3.2 and is_equal_approx(player.fuel, 100.0), "tap jump = normal jump, no fuel (%.1f m, fuel %.1f, state %s)" % [top, player.fuel, Fighter.State.keys()[player.state]])
 
-	# --- Machine gun: hold FIRE ---
+	# Firing happens in aim mode: AIM button toggles it, the crosshair is aimed by hand
+	# (aim_at), and the attack pad is the trigger.
+	# --- Machine gun: hold the trigger ---
 	await _face_off(8.0)
-	var fire_btn := controls.button_center(&"fire")
-	touch(3, fire_btn, true)
+	await _enter_aim()
+	touch(1, pad, true)
 	await frames(60)
-	touch(3, fire_btn, false)
+	touch(1, pad, false)
 	await frames(10)
-	check(player.ammo <= 60 - 9, "MG fires while held (ammo %d)" % player.ammo)
+	check(player.ammo <= 60 - 9, "MG fires while the trigger is held (ammo %d)" % player.ammo)
 	check(opponent.health < 100.0, "MG bullets hit (health %.1f)" % opponent.health)
 	check(opponent.state != Fighter.State.STAGGER, "MG doesn't stagger")
 
@@ -102,10 +133,10 @@ func _run() -> void:
 	await _face_off(8.0)
 	brain.set_physics_process(false)
 	opponent.charge_input = true
-	await frames(10)
-	touch(3, fire_btn, true)
+	await _enter_aim()
+	touch(1, pad, true)
 	await frames(15)
-	touch(3, fire_btn, false)
+	touch(1, pad, false)
 	check(opponent.state == Fighter.State.STAGGER or opponent.state == Fighter.State.FREE, "MG interrupts charge (state %s)" % Fighter.State.keys()[opponent.state])
 	opponent.charge_input = false
 	brain.set_physics_process(true)
@@ -114,9 +145,10 @@ func _run() -> void:
 	await _face_off(8.0)
 	player.barrel = BarrelDef.rocket()
 	player.ammo = player.barrel.max_ammo
-	touch(3, fire_btn, true)
+	await _enter_aim()
+	touch(1, pad, true)
 	await frames(40)
-	touch(3, fire_btn, false)
+	touch(1, pad, false)
 	await frames(5)
 	check(player.ammo == 3, "rocket = one shot per press (ammo %d)" % player.ammo)
 	check(is_equal_approx(opponent.health, 84.0), "rocket hits for 16 (health %.1f)" % opponent.health)
@@ -126,8 +158,8 @@ func _run() -> void:
 	player.barrel = BarrelDef.rocket()
 	player.ammo = player.barrel.max_ammo
 	brain.mode = DummyBrain.Mode.BLOCK
-	await frames(20)
-	tap(3, fire_btn)
+	await _enter_aim()
+	tap(1, pad)
 	await frames(40)
 	check(is_equal_approx(opponent.health, 98.4), "blocked rocket = chip only (health %.1f)" % opponent.health)
 	check(opponent.stamina < 80.0, "blocked rocket costs stamina (%.1f)" % opponent.stamina)
@@ -135,9 +167,12 @@ func _run() -> void:
 	# --- Out of ammo ---
 	await _face_off(8.0)
 	player.ammo = 0
-	tap(3, fire_btn)
+	await _enter_aim()
+	tap(1, pad)
 	await frames(30)
 	check(is_equal_approx(opponent.health, 100.0), "no ammo = no shot")
+	tap(3, controls.button_center(&"fire"))  # leave aim mode
+	await frames(3)
 
 	# --- Pickups ---
 	var fuel_pack: Pickup = main.get_node("Pickups/FuelPackA")
@@ -172,12 +207,20 @@ func _face_off(dist: float) -> void:
 		if node is Projectile:
 			node.queue_free()
 	manager.reset_fighters()
+	player.set_aiming(false)
 	player.barrel = BarrelDef.machine_gun()
 	player.reset_to(Vector3(0, 0, 20 + dist), 0.0)
 	opponent.reset_to(Vector3(0, 0, 20), PI)
 	rig.yaw = 0.0
 	rig.set_lock_target(opponent)
 	await frames(8)
+
+
+## Toggle aim mode with the AIM button, let the camera settle, put the crosshair on the opponent.
+func _enter_aim() -> void:
+	tap(3, controls.button_center(&"fire"))
+	await frames(30)
+	await aim_at(opponent)
 
 
 func _flick(dir: Vector2) -> void:

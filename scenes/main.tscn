@@ -12,6 +12,8 @@
 [ext_resource type="Script" path="res://scripts/ui/loadout_menu.gd" id="10"]
 [ext_resource type="Script" path="res://scripts/ui/result_panel.gd" id="11"]
 [ext_resource type="Script" path="res://scripts/input/desktop_controls.gd" id="12"]
+[ext_resource type="Script" path="res://scripts/fx/screen_fx.gd" id="13"]
+[ext_resource type="Script" path="res://scripts/fx/fx_director.gd" id="14"]
 
 [sub_resource type="ProceduralSkyMaterial" id="sky_mat"]
 sky_top_color = Color(0.04, 0.07, 0.14, 1)
@@ -62,6 +64,22 @@ fighter = NodePath("../Player")
 camera_rig = NodePath("../CameraRig")
 controls = NodePath("../UI/TouchControls")
 desktop = NodePath("../DesktopControls")
+
+[node name="ScreenFxLayer" type="CanvasLayer" parent="."]
+layer = 0
+
+[node name="ScreenFx" type="ColorRect" parent="ScreenFxLayer"]
+anchors_preset = 15
+anchor_right = 1.0
+anchor_bottom = 1.0
+mouse_filter = 2
+script = ExtResource("13")
+
+[node name="FxDirector" type="Node" parent="." node_paths=PackedStringArray("player", "camera_rig", "screen_fx")]
+script = ExtResource("14")
+player = NodePath("../Player")
+camera_rig = NodePath("../CameraRig")
+screen_fx = NodePath("../ScreenFxLayer/ScreenFx")
 
 [node name="UI" type="CanvasLayer" parent="."]
 

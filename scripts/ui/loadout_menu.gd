@@ -121,7 +121,7 @@ func _side(col: VBoxContainer, side: StringName, title: String, color: Color) ->
 	var armor_names: Array = []
 	for id in ArmorDef.IDS:
 		var a := ArmorDef.by_id(id)
-		armor_names.append("%s\n%d HP" % [a.display_name, a.max_health])
+		armor_names.append("%s\n%d HP · %s" % [a.display_name, a.max_health, a.tagline])
 	var current_armor: StringName = player_armor if side == &"player" else opponent_armor
 	col.add_child(_choice_row(ArmorDef.IDS, armor_names, current_armor, func(v): _set_armor(side, v)))
 

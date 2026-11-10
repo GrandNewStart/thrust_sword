@@ -1,6 +1,6 @@
 class_name Movesets
 ## Attack sets. Keys match the attack names PlayerIntent sends.
-##   light       tap
+##   light       tap — a 3-hit chain: light (swing left) → light_2 (swing right) → light_3 (poke)
 ##   slash_left  swipe left  (blade sweeps right -> left)
 ##   slash_right swipe right (blade sweeps left -> right)
 ##   thrust      swipe up    (long lunging stab)
@@ -9,6 +9,11 @@ class_name Movesets
 ## Pose yaw: negative = blade pointing to the fighter's right, positive = left.
 
 const HEAVY_FULL_CHARGE_DAMAGE_MULT := 1.8
+## All attacks (windup, swing, recovery) last this much longer than the base numbers below.
+## The animations are scrubbed to these timings, so this also slows the visible swings.
+const ATTACK_DURATION_MULT := 1.5
+## The light chain, in order.
+const LIGHT_CHAIN: Array[StringName] = [&"light", &"light_2", &"light_3"]
 
 
 static func standard() -> Dictionary:
@@ -17,6 +22,14 @@ static func standard() -> Dictionary:
 			windup = 0.12, active = 0.12, recovery = 0.26, reach = 2.7, arc_deg = 110.0,
 			lunge_speed = 3.0, hitstun = 0.35, knockback = 2.5, cancel_ratio = 0.4,
 			pose_start = Vector3(-90, -70, 0), pose_end = Vector3(-90, 70, 0) },
+		{ name = &"light_2", damage = 8.0, stamina_cost = 12.0,
+			windup = 0.12, active = 0.12, recovery = 0.26, reach = 2.7, arc_deg = 110.0,
+			lunge_speed = 3.0, hitstun = 0.35, knockback = 2.5, cancel_ratio = 0.4,
+			pose_start = Vector3(-90, 70, 0), pose_end = Vector3(-90, -70, 0) },
+		{ name = &"light_3", damage = 11.0, stamina_cost = 14.0,
+			windup = 0.14, active = 0.10, recovery = 0.32, reach = 3.2, arc_deg = 45.0,
+			lunge_speed = 6.0, hitstun = 0.45, knockback = 4.5, cancel_ratio = 0.6,
+			pose_start = Vector3(-80, -5, 0), pose_end = Vector3(-92, 0, 0) },
 		{ name = &"slash_left", damage = 12.0, stamina_cost = 16.0,
 			windup = 0.16, active = 0.14, recovery = 0.32, reach = 2.9, arc_deg = 160.0,
 			lunge_speed = 4.0, hitstun = 0.45, knockback = 3.5,
@@ -40,7 +53,11 @@ static func standard() -> Dictionary:
 	]
 	var set := {}
 	for d in list:
-		set[d.name] = AttackDef.from_dict(d)
+		var a := AttackDef.from_dict(d)
+		a.windup *= ATTACK_DURATION_MULT
+		a.active *= ATTACK_DURATION_MULT
+		a.recovery *= ATTACK_DURATION_MULT
+		set[d.name] = a
 	return set
 
 

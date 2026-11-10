@@ -5,13 +5,14 @@ extends Node
 ##
 ##   WASD            move            Shift  run
 ##   double-tap WASD thrust dash     C      dash toward the movement direction
-##   Space           jump (hold in the air = vertical thrust)
+##   Space           jump; press again in the air = vertical dash (boost)
 ##   Mouse           camera (while not locked on)
 ##   LMB click       light attack
 ##   LMB + flick     directional slash (← → slashes, ↑ thrust, ↓ smash) — like a swipe
 ##   LMB hold        charge heavy, release to strike
 ##   RMB             guard (hold) / parry (tap just before a hit)
-##   F               fire secondary weapon
+##   F               toggle aim mode (gun): planted, close-up camera, mouse = crosshair,
+##                   LMB = fire (hold for automatic weapons)
 ##   Tab / MMB       lock on / release
 ## Key state is tracked from events (not the global Input singleton), so tests can drive it.
 
@@ -29,6 +30,8 @@ const MOVE_KEYS := {
 }
 
 var intent := PlayerIntent.new()
+## Set by the player controller: in aim mode LMB fires instead of attacking.
+var aiming := false
 ## Off while menus are open: mouse is released and input ignored.
 var enabled := true:
 	set(v):
@@ -86,7 +89,7 @@ func _input(event: InputEvent) -> void:
 			return
 		_on_mouse_button(event.button_index, event.pressed)
 	elif event is InputEventMouseMotion:
-		if _lmb_down:
+		if _lmb_down and not aiming:
 			_lmb_delta += event.relative  # gesture, like a swipe on the touch pad: camera holds still
 		else:
 			intent.look_delta += event.relative * mouse_sensitivity
@@ -100,7 +103,7 @@ func _on_key(key: Key, pressed: bool) -> void:
 		KEY_SPACE:
 			intent.jump_pressed = true
 		KEY_F:
-			intent.fire_pressed = true
+			intent.aim_toggle = true
 		KEY_TAB:
 			intent.lock_toggle = true
 		KEY_C:
@@ -118,6 +121,11 @@ func _on_key(key: Key, pressed: bool) -> void:
 func _on_mouse_button(button: MouseButton, pressed: bool) -> void:
 	match button:
 		MOUSE_BUTTON_LEFT:
+			if aiming:  # aim mode: the left button is the trigger
+				_lmb_down = pressed
+				if pressed:
+					intent.fire_pressed = true
+				return
 			if pressed:
 				_lmb_down = true
 				_lmb_time = _now()
@@ -162,8 +170,8 @@ func _process(_delta: float) -> void:
 	intent.move = _move_vector()
 	intent.run = is_key_down(KEY_SHIFT)
 	intent.jump_held = is_key_down(KEY_SPACE)
-	intent.fire_held = is_key_down(KEY_F)
+	intent.fire_held = aiming and _lmb_down
 	# Left button held still long enough = charging a heavy attack.
-	if _lmb_down and not _charging and _lmb_delta.length() <= tap_max_move and _now() - _lmb_time >= hold_time:
+	if _lmb_down and not aiming and not _charging and _lmb_delta.length() <= tap_max_move and _now() - _lmb_time >= hold_time:
 		_charging = true
 	intent.charge_held = _charging
