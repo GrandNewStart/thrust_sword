@@ -1,0 +1,94 @@
+[gd_scene format=3]
+
+[ext_resource type="Script" path="res://scripts/fighter/fighter.gd" id="1"]
+[ext_resource type="Script" path="res://scripts/fighter/fighter_visual.gd" id="2"]
+
+[sub_resource type="CapsuleShape3D" id="shape"]
+radius = 0.45
+height = 1.9
+
+[sub_resource type="CapsuleMesh" id="body_mesh"]
+radius = 0.45
+height = 1.9
+
+[sub_resource type="BoxMesh" id="visor_mesh"]
+size = Vector3(0.5, 0.16, 0.14)
+
+[sub_resource type="StandardMaterial3D" id="visor_mat"]
+albedo_color = Color(0.2, 0.9, 1, 1)
+emission_enabled = true
+emission = Color(0.2, 0.9, 1, 1)
+emission_energy_multiplier = 2.0
+
+[sub_resource type="BoxMesh" id="blade_mesh"]
+size = Vector3(0.12, 2.1, 0.45)
+
+[sub_resource type="StandardMaterial3D" id="blade_mat"]
+albedo_color = Color(0.78, 0.8, 0.85, 1)
+metallic = 0.85
+roughness = 0.25
+
+[sub_resource type="CylinderMesh" id="thruster_mesh"]
+top_radius = 0.12
+bottom_radius = 0.2
+height = 0.4
+
+[sub_resource type="StandardMaterial3D" id="thruster_mat"]
+albedo_color = Color(1, 0.55, 0.15, 1)
+emission_enabled = true
+emission = Color(1, 0.5, 0.1, 1)
+emission_energy_multiplier = 1.5
+
+[sub_resource type="CylinderMesh" id="flame_mesh"]
+top_radius = 0.17
+bottom_radius = 0.0
+height = 1.0
+radial_segments = 12
+
+[sub_resource type="StandardMaterial3D" id="flame_mat"]
+shading_mode = 0
+albedo_color = Color(1, 0.65, 0.25, 1)
+
+[node name="Fighter" type="CharacterBody3D" groups=["fighters", "lockable"]]
+collision_layer = 2
+collision_mask = 3
+script = ExtResource("1")
+
+[node name="CollisionShape3D" type="CollisionShape3D" parent="."]
+position = Vector3(0, 0.95, 0)
+shape = SubResource("shape")
+
+[node name="Visual" type="Node3D" parent="."]
+script = ExtResource("2")
+
+[node name="Body" type="MeshInstance3D" parent="Visual"]
+position = Vector3(0, 0.95, 0)
+mesh = SubResource("body_mesh")
+
+[node name="Visor" type="MeshInstance3D" parent="Visual"]
+position = Vector3(0, 1.55, -0.4)
+mesh = SubResource("visor_mesh")
+surface_material_override/0 = SubResource("visor_mat")
+
+[node name="SwordPivot" type="Node3D" parent="Visual"]
+position = Vector3(0.5, 1.25, -0.15)
+
+[node name="Sword" type="Node3D" parent="Visual/SwordPivot"]
+
+[node name="Blade" type="MeshInstance3D" parent="Visual/SwordPivot/Sword"]
+position = Vector3(0, 1.3, 0)
+mesh = SubResource("blade_mesh")
+surface_material_override/0 = SubResource("blade_mat")
+
+[node name="Thruster" type="MeshInstance3D" parent="Visual/SwordPivot/Sword"]
+position = Vector3(0, 0.1, 0)
+rotation = Vector3(3.14159, 0, 0)
+mesh = SubResource("thruster_mesh")
+surface_material_override/0 = SubResource("thruster_mat")
+
+[node name="Flame" type="MeshInstance3D" parent="Visual/SwordPivot/Sword"]
+visible = false
+position = Vector3(0, -0.6, 0)
+cast_shadow = 0
+mesh = SubResource("flame_mesh")
+surface_material_override/0 = SubResource("flame_mat")

@@ -1,0 +1,7 @@
+.godot/
+/android/
+*.tmp
+build/
+
+# Mixamo raw files: free to use in the game, but not to redistribute (keep out of public repos)
+assets/mixamo/
