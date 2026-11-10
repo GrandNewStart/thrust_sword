@@ -5,8 +5,8 @@
 set -euo pipefail
 cd "$(dirname "$0")/.."
 
-NAME="SwordThruster"
-BUNDLE_ID="com.jinwoo.swordthruster"
+NAME="ThrustSword"
+BUNDLE_ID="com.jinwoo.thrustsword"
 TEAM="Q82L72UCXN"
 OUT="build/ios"
 

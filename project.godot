@@ -3,7 +3,7 @@ config_version=5
 
 [application]
 
-config/name="Sword Thruster PoC"
+config/name="Thrust Sword"
 run/main_scene="res://scenes/main.tscn"
 config/features=PackedStringArray("4.7", "Mobile")
 config/icon="res://icon.png"

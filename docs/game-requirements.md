@@ -1,6 +1,8 @@
-# Game Requirements — v0.4
+# Thrust Sword — Game Requirements v0.5
 
-> Status: **PoC build complete (steps 1–5)** — next: on-device tuning, then online PvP. ✅ = decided · 💡 = proposed default (used unless changed) · ❓ = open
+> Status: **PoC complete.** PoC 1 (iOS touch) and PoC 2 (macOS keyboard + mouse) played identically;
+> desktop gives much more freedom, so **desktop is now the lead platform** (Windows, macOS, possibly Linux).
+> Next: refining the game on the desktop build. ✅ = decided · 💡 = proposed default (used unless changed) · ❓ = open
 > All numbers (costs, damage, speeds) are starting points and will be tuned in playtesting.
 
 ## 1. Vision
@@ -25,7 +27,7 @@ The PoC opponent is an **AI**. Real player-vs-player (online) is the next phase 
 | Item | Decision |
 |---|---|
 | Engine | Godot 4 (GDScript) |
-| Platform | Mobile first (iOS/Android), **portrait** orientation |
+| Platform | **Desktop first** (Windows, macOS, possibly Linux), keyboard + mouse, landscape. iOS portrait touch kept as a secondary build |
 | Grip | **Two thumbs** |
 | Dev testing | 💡 Desktop build with mouse emulating touch, plus regular builds on a real device |
 | Art | 💡 Simple placeholder shapes and basic materials for the PoC; Halo-style sci-fi direction later |
@@ -148,7 +150,7 @@ front-end differs (input scheme, landscape layout, camera FOV, renderer).
 - Keyboard + mouse produce the same PlayerIntent as touch. The left mouse button reuses the touch
   attack-pad gestures (click / flick / hold), so attack selection works identically.
 - Landscape 16:9 window, centred HUD column, side-by-side SETUP menu, Forward+ renderer.
-- Built as `build/macos/SwordThruster.app` (ad-hoc signed, for local testing).
+- Built as `build/macos/ThrustSword.app` (ad-hoc signed, for local testing).
 
 ## 12. Out of Scope for PoC
 - Online PvP (next phase)

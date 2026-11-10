@@ -1,9 +1,14 @@
-# Sword Thruster PoC
+# Thrust Sword
 
-3D third-person duel game prototype. Built with **Godot 4.7** (GDScript).
-One codebase, two front-ends with identical gameplay:
-- **PoC 1 — iOS**, portrait, two-thumb touch controls (`tools/ios_deploy.sh`)
-- **PoC 2 — macOS**, landscape window, keyboard + mouse (`tools/macos_build.sh`)
+3D third-person sci-fi duel game: fight with a giant sword that is also a thruster and a gun.
+Built with **Godot 4.7** (GDScript).
+
+**Lead platform: desktop** (Windows, macOS, possibly Linux) with keyboard + mouse.
+The proof-of-concept phase is complete:
+- **PoC 1 — iOS**, portrait, two-thumb touch controls (`tools/ios_deploy.sh`) — still builds
+- **PoC 2 — macOS**, landscape window, keyboard + mouse (`tools/macos_build.sh`) — chosen direction
+
+Both share one codebase with identical gameplay; only the input scheme and layout differ.
 Design spec: [docs/game-requirements.md](docs/game-requirements.md)
 
 ## Run
@@ -17,7 +22,7 @@ godot --headless --path . -s tests/test_step4.gd   # swords / armor / AI test
 godot --headless --path . -s tests/test_step5.gd   # match loop test
 godot --headless --path . -s tests/test_desktop.gd # keyboard + mouse test
 tools/ios_deploy.sh                                # build + install on a connected iPhone
-tools/macos_build.sh                               # build build/macos/SwordThruster.app and launch it
+tools/macos_build.sh                               # build build/macos/ThrustSword.app and launch it
 godot --path . -- --touch                          # run the touch layout on desktop (mouse = finger)
 godot --path . -s tests/screenshot.gd -- <dir>     # render screenshots
 ```

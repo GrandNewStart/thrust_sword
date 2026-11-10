@@ -6,11 +6,11 @@ set -euo pipefail
 cd "$(dirname "$0")/.."
 OUT="build/macos"
 mkdir -p "$OUT" && touch build/.gdignore  # keep Godot from importing build output
-rm -rf "$OUT/SwordThruster.app"
+rm -rf "$OUT/ThrustSword.app"
 echo "▸ Exporting macOS app…"
-godot --headless --path . --export-release "macOS" "$OUT/SwordThruster.app" 2>&1 | grep -E "ERROR|error" || true
-[[ -d "$OUT/SwordThruster.app" ]] || { echo "✗ Export failed"; exit 1; }
-echo "✓ $OUT/SwordThruster.app ($(du -sh "$OUT/SwordThruster.app" | cut -f1))"
+godot --headless --path . --export-release "macOS" "$OUT/ThrustSword.app" 2>&1 | grep -E "ERROR|error" || true
+[[ -d "$OUT/ThrustSword.app" ]] || { echo "✗ Export failed"; exit 1; }
+echo "✓ $OUT/ThrustSword.app ($(du -sh "$OUT/ThrustSword.app" | cut -f1))"
 if [[ "${1:-}" != "--no-run" ]]; then
-  open "$OUT/SwordThruster.app"
+  open "$OUT/ThrustSword.app"
 fi
