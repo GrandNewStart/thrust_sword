@@ -14,10 +14,9 @@ func _run() -> void:
 	var args := OS.get_cmdline_user_args()
 	out_dir = args[0] if args.size() > 0 else "user://"
 	vp = SubViewport.new()
-	vp.size = Vector2i(720, 1280)
+	vp.size = Vector2i(1280, 720)
 	vp.render_target_update_mode = SubViewport.UPDATE_ALWAYS
 	root.add_child(vp)
-	InputMode.forced = InputMode.Kind.TOUCH
 	var main: Node = load("res://scenes/main.tscn").instantiate()
 	vp.add_child(main)
 	var session: SessionManager = main.get_node("Session")

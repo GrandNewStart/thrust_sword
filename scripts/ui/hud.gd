@@ -42,7 +42,7 @@ func _draw() -> void:
 	# Bars, timer and hints live in a column at most 760 px wide, centred (landscape desktop).
 	var w := minf(size.x, 760.0)
 	var x0 := (size.x - w) * 0.5
-	var top_hud := Vector2(x0, SafeArea.insets(self).top)  # below the notch / Dynamic Island
+	var top_hud := Vector2(x0, 0)
 	_draw_low_health_warning()
 	draw_set_transform(top_hud)
 
@@ -80,15 +80,14 @@ func _draw() -> void:
 		draw_string(font, Vector2(0, 36), str(secs), HORIZONTAL_ALIGNMENT_RIGHT, w - 24, 32, timer_color)
 
 	# Lock-on reticle + hint
-	var touch := InputMode.is_touch()
-	var hint := "Tap the opponent to lock on" if touch else "Tab / middle mouse: lock on"
+	var hint := "Tab / middle mouse: lock on"
 	var aiming := player != null and player.aiming
 	var hint_color := Color(1, 1, 1, 0.5)
 	if aiming:
-		hint = "AIMING · stick = aim, pad = fire · AIM to exit" if touch else "AIMING · mouse = aim, LMB = fire · F to exit"
+		hint = "AIMING · mouse = aim, LMB = fire · F to exit"
 		hint_color = Color(1, 0.8, 0.45, 0.9)
 	elif camera_rig and camera_rig.is_locked():
-		hint = "LOCKED · double-tap empty area to release" if touch else "LOCKED · Tab to release"
+		hint = "LOCKED · Tab to release"
 		hint_color = Color(1, 0.6, 0.55, 0.8)
 		var cam := camera_rig.camera
 		var p := camera_rig.lock_target.global_position + Vector3.UP * 1.0
@@ -122,7 +121,7 @@ func _draw() -> void:
 		_draw_crosshair()
 	_draw_banner(font)
 	var in_menu := session != null and session.phase in [SessionManager.Phase.SETUP, SessionManager.Phase.MATCH_END]
-	if not touch and not in_menu:
+	if not in_menu:
 		_draw_desktop_help(font)
 
 	if show_debug and player:

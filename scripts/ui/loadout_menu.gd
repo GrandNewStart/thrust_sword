@@ -40,16 +40,14 @@ func _build() -> void:
 
 	var margin := MarginContainer.new()
 	margin.set_anchors_preset(Control.PRESET_FULL_RECT)
-	var top_inset: float = SafeArea.insets(self).top
-	var bottom_inset: float = SafeArea.insets(self).bottom
 	var screen := get_viewport_rect().size
 	_wide = screen.x > screen.y
 	var max_w := 1100.0 if _wide else 760.0
 	var side := int(maxf(28.0, (screen.x - max_w) * 0.5))
 	margin.add_theme_constant_override("margin_left", side)
 	margin.add_theme_constant_override("margin_right", side)
-	margin.add_theme_constant_override("margin_top", int((20 if _wide else 40) + top_inset))
-	margin.add_theme_constant_override("margin_bottom", int(30 + bottom_inset))
+	margin.add_theme_constant_override("margin_top", int((20 if _wide else 40)))
+	margin.add_theme_constant_override("margin_bottom", int(30))
 	add_child(margin)
 
 	var col := VBoxContainer.new()

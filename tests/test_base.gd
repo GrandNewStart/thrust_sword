@@ -1,6 +1,6 @@
 extends SceneTree
-## Shared setup for automated tests. Runs the game in a fixed 720x1280 portrait
-## viewport (headless has no real window) and drives it with simulated touches.
+## Shared setup for automated tests. Runs the game in a fixed 1280x720 viewport (headless has
+## no real window) and drives it with simulated keyboard + mouse events.
 ## Subclasses implement _run() and call finish() at the end.
 
 var _failures := 0
@@ -9,7 +9,7 @@ var main: Node
 var player: Fighter
 var opponent: Fighter
 var rig: FighterCamera
-var controls: TouchControls
+var desktop: DesktopControls
 var brain: DummyBrain
 var manager: SessionManager
 
@@ -17,9 +17,8 @@ var manager: SessionManager
 func _initialize() -> void:
 	seed(20261110)  # AI and weapon spread use randomness; keep test runs repeatable
 	vp = SubViewport.new()
-	vp.size = Vector2i(720, 1280)
+	vp.size = Vector2i(1280, 720)
 	root.add_child(vp)
-	InputMode.forced = _input_kind()
 	main = load("res://scenes/main.tscn").instantiate()
 	# Keep built-in default stats unless a test applies loadouts itself.
 	(main.get_node("Session") as SessionManager).auto_start = false
@@ -27,7 +26,7 @@ func _initialize() -> void:
 	player = main.get_node("Player")
 	opponent = main.get_node("Opponent")
 	rig = main.get_node("CameraRig")
-	controls = main.get_node("UI/TouchControls")
+	desktop = main.get_node("DesktopControls")
 	brain = main.get_node("DummyBrain")
 	brain.rng.seed = 20261110
 	player.rng.seed = 1
@@ -40,10 +39,6 @@ func _initialize() -> void:
 func _run() -> void:
 	pass
 
-
-## Which control scheme the test drives. Override in desktop tests.
-func _input_kind() -> InputMode.Kind:
-	return InputMode.Kind.TOUCH
 
 
 func finish() -> void:
@@ -60,22 +55,6 @@ func check(ok: bool, label: String) -> void:
 func frames(n: int) -> void:
 	for i in n:
 		await physics_frame
-
-
-func touch(index: int, pos: Vector2, pressed: bool) -> void:
-	var e := InputEventScreenTouch.new()
-	e.index = index
-	e.position = pos
-	e.pressed = pressed
-	vp.push_input(e, true)
-
-
-func drag(index: int, pos: Vector2, relative: Vector2) -> void:
-	var e := InputEventScreenDrag.new()
-	e.index = index
-	e.position = pos
-	e.relative = relative
-	vp.push_input(e, true)
 
 
 func key(code: Key, pressed: bool) -> void:
@@ -115,12 +94,28 @@ func aim_at(target: Node3D, height := 1.1) -> void:
 		await frames(2)
 
 
-func tap(index: int, pos: Vector2) -> void:
-	touch(index, pos, true)
-	touch(index, pos, false)
+## Left click = light attack.
+func click() -> void:
+	mouse_button(MOUSE_BUTTON_LEFT, true)
+	mouse_button(MOUSE_BUTTON_LEFT, false)
 
 
-func swipe(index: int, from: Vector2, delta: Vector2) -> void:
-	touch(index, from, true)
-	drag(index, from + delta, delta)
-	touch(index, from + delta, false)
+## Left button + quick mouse flick = directional slash (screen directions: up = thrust).
+func flick(delta: Vector2) -> void:
+	mouse_button(MOUSE_BUTTON_LEFT, true)
+	mouse_move(delta)
+	mouse_button(MOUSE_BUTTON_LEFT, false)
+
+
+## Double-tap a movement key = dash that way (stick space: y = forward).
+func double_tap_dir(dir: Vector2) -> void:
+	var k := KEY_W
+	if dir.y < -0.5:
+		k = KEY_S
+	elif dir.x > 0.5:
+		k = KEY_D
+	elif dir.x < -0.5:
+		k = KEY_A
+	key_tap(k)
+	await frames(2)
+	key_tap(k)

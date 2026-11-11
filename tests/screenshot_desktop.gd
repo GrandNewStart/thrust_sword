@@ -12,7 +12,6 @@ func _initialize() -> void:
 
 func _run() -> void:
 	out_dir = OS.get_cmdline_user_args()[0] if OS.get_cmdline_user_args().size() > 0 else "user://"
-	InputMode.forced = InputMode.Kind.DESKTOP
 	vp = SubViewport.new()
 	vp.size = Vector2i(1600, 900)
 	vp.render_target_update_mode = SubViewport.UPDATE_ALWAYS

@@ -4,7 +4,6 @@
 [ext_resource type="PackedScene" path="res://scenes/fighter.tscn" id="2"]
 [ext_resource type="PackedScene" path="res://scenes/camera_rig.tscn" id="3"]
 [ext_resource type="Script" path="res://scripts/player/player_controller.gd" id="4"]
-[ext_resource type="Script" path="res://scripts/ui/touch_controls.gd" id="5"]
 [ext_resource type="Script" path="res://scripts/ui/hud.gd" id="6"]
 [ext_resource type="Script" path="res://scripts/ai/dummy_brain.gd" id="7"]
 [ext_resource type="Script" path="res://scripts/game/session_manager.gd" id="8"]
@@ -58,11 +57,10 @@ body_color = Color(0.6, 0.2, 0.18, 1)
 [node name="DesktopControls" type="Node" parent="."]
 script = ExtResource("12")
 
-[node name="PlayerController" type="Node" parent="." node_paths=PackedStringArray("fighter", "camera_rig", "controls", "desktop")]
+[node name="PlayerController" type="Node" parent="." node_paths=PackedStringArray("fighter", "camera_rig", "desktop")]
 script = ExtResource("4")
 fighter = NodePath("../Player")
 camera_rig = NodePath("../CameraRig")
-controls = NodePath("../UI/TouchControls")
 desktop = NodePath("../DesktopControls")
 
 [node name="ScreenFxLayer" type="CanvasLayer" parent="."]
@@ -95,27 +93,6 @@ player = NodePath("../../Player")
 opponent = NodePath("../../Opponent")
 session = NodePath("../../Session")
 
-[node name="TouchControls" type="Control" parent="UI"]
-layout_mode = 3
-anchors_preset = 15
-anchor_right = 1.0
-anchor_bottom = 1.0
-mouse_filter = 2
-script = ExtResource("5")
-
-[node name="SetupButton" type="Button" parent="UI"]
-anchors_preset = 1
-anchor_left = 1.0
-anchor_right = 1.0
-offset_left = -230.0
-offset_top = 76.0
-offset_right = -24.0
-offset_bottom = 136.0
-grow_horizontal = 0
-focus_mode = 0
-theme_override_font_sizes/font_size = 20
-text = "SETUP"
-
 [node name="ResultPanel" type="Control" parent="UI"]
 layout_mode = 3
 anchors_preset = 15
@@ -135,7 +112,7 @@ script = ExtResource("7")
 fighter = NodePath("../Opponent")
 target = NodePath("../Player")
 
-[node name="Session" type="Node" parent="." node_paths=PackedStringArray("player", "opponent", "brain", "camera_rig", "setup_button", "menu", "result_panel", "controls", "player_controller")]
+[node name="Session" type="Node" parent="." node_paths=PackedStringArray("player", "opponent", "brain", "camera_rig", "menu", "result_panel", "player_controller")]
 script = ExtResource("8")
 player = NodePath("../Player")
 opponent = NodePath("../Opponent")
@@ -143,9 +120,7 @@ brain = NodePath("../DummyBrain")
 camera_rig = NodePath("../CameraRig")
 result_panel = NodePath("../UI/ResultPanel")
 player_controller = NodePath("../PlayerController")
-setup_button = NodePath("../UI/SetupButton")
 menu = NodePath("../UI/LoadoutMenu")
-controls = NodePath("../UI/TouchControls")
 
 [node name="Pickups" type="Node3D" parent="."]
 

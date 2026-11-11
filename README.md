@@ -3,38 +3,36 @@
 3D third-person sci-fi duel game: fight with a giant sword that is also a thruster and a gun.
 Built with **Godot 4.7** (GDScript).
 
-**Lead platform: desktop** (Windows, macOS, possibly Linux) with keyboard + mouse.
-The proof-of-concept phase is complete:
-- **PoC 1 — iOS**, portrait, two-thumb touch controls (`tools/ios_deploy.sh`) — still builds
-- **PoC 2 — macOS**, landscape window, keyboard + mouse (`tools/macos_build.sh`) — chosen direction
-
-Both share one codebase with identical gameplay; only the input scheme and layout differ.
+**Target platforms: PC (Steam — Windows, macOS, Linux) and consoles (PlayStation, Xbox, Nintendo).**
+This branch (`develop`) is desktop/console only, played with keyboard + mouse (gamepad support next).
+The mobile touch version (iOS, portrait) lives on the `mobile` branch and is no longer maintained here.
 Design spec: [docs/game-requirements.md](docs/game-requirements.md)
 
 ## Run
 ```sh
-godot --path .            # play (desktop window, mouse acts as one finger)
+godot --path .            # play
 godot -e --path .         # open in the editor
-godot --headless --path . -s tests/test_step1.gd   # movement / camera / lock-on test
-godot --headless --path . -s tests/test_step2.gd   # combat test
-godot --headless --path . -s tests/test_step3.gd   # thrust / fuel / secondary fire test
-godot --headless --path . -s tests/test_step4.gd   # swords / armor / AI test
-godot --headless --path . -s tests/test_step5.gd   # match loop test
-godot --headless --path . -s tests/test_desktop.gd # keyboard + mouse test
+tools/build.sh macos --run  # export build/macos/ThrustSword.app and launch it
+tools/build.sh windows      # export build/windows/ThrustSword.exe
+tools/build.sh linux        # export build/linux/ThrustSword.x86_64
+tools/build.sh all          # all three
+```
+
+Tests (headless):
+```sh
+godot --headless --path . -s tests/test_desktop.gd  # controls: move / camera / lock-on / attacks / aim / pause
+godot --headless --path . -s tests/test_step2.gd    # combat
+godot --headless --path . -s tests/test_step3.gd    # thrust / fuel / secondary fire
+godot --headless --path . -s tests/test_step4.gd    # swords / armor / AI
+godot --headless --path . -s tests/test_step5.gd    # match loop
 godot --headless --path . -s tests/test_movement.gd # movement feel (inertia, armor weight)
-godot --headless --path . -s tests/test_combo.gd   # light attack chain
-godot --headless --path . -s tests/test_aim.gd     # manual aim mode
-godot --headless --path . -s tests/test_fx.gd      # effects wiring
-godot --path . -s tests/screenshot_fx.gd -- out.png # render effect moments
-tools/ios_deploy.sh                                # build + install on a connected iPhone
-tools/macos_build.sh                               # build build/macos/ThrustSword.app and launch it
-godot --path . -- --touch                          # run the touch layout on desktop (mouse = finger)
-godot --path . -s tests/screenshot.gd -- <dir>     # render screenshots
+godot --headless --path . -s tests/test_combo.gd    # light attack chain
+godot --headless --path . -s tests/test_aim.gd      # manual aim mode
+godot --headless --path . -s tests/test_fx.gd       # effects wiring
+godot --path . -s tests/screenshot_fx.gd -- out.png # render effect moments (needs a window)
 ```
 
 ## Controls
-Desktop (macOS) — same actions, same gesture logic as touch:
-
 | Keyboard + mouse | Action |
 |---|---|
 | WASD · Shift | move · run |
@@ -46,18 +44,6 @@ Desktop (macOS) — same actions, same gesture logic as touch:
 | F | toggle **aim mode** (swords with a gun): planted, close-up over-the-shoulder view, mouse moves the crosshair, LMB fires (hold for the machine gun). No auto-aim. Jump / dash / guard / getting hit leave it |
 | Tab / middle mouse | lock on / release |
 | Esc | setup menu |
-
-Touch (phone):
-
-| Touch | Action |
-|---|---|
-| Bottom-left joystick | move · push to the edge to run · double-flick = thrust dash |
-| Bottom-right drag | camera |
-| Attack pad: tap · swipe ←/→/↑/↓ · hold, release | light chain (swing left → swing right → poke) · slash / thrust / smash · charged heavy |
-| GUARD hold · tap just before a hit | block · parry |
-| JUMP · JUMP again in the air | jump · vertical dash (one-time boost, uses fuel) |
-| AIM (not shown for Breaker) | toggle **aim mode**: left stick moves the crosshair, attack pad fires (hold for the machine gun) |
-| Tap opponent · double-tap empty area | lock on · release |
 
 Orange canisters = fuel packs (+50 fuel), cyan boxes = ammo packs (+50% ammo). Both respawn after 15 s.
 Fuel never regenerates on its own.
@@ -89,8 +75,8 @@ scripts/combat/    SwordDef (3 presets: blade + core + thruster + barrel), Armor
 scripts/ai/        DummyBrain — training partner (idle / block / attack / spar)
 scripts/game/      SessionManager — match rounds / timer / banners / results, training mode, loadouts
 scripts/input/     PlayerIntent — device-independent "what the player wants";
-                   InputMode (touch vs desktop), DesktopControls (keyboard + mouse)
-scripts/ui/        TouchControls (portrait touch layout), Hud, LoadoutMenu (SETUP), ResultPanel
+                   DesktopControls (keyboard + mouse) fills it; a gamepad scheme would fill the same intent
+scripts/ui/        Hud, LoadoutMenu (SETUP), ResultPanel
 scripts/fighter/   Fighter — movement, attacks, guard/parry, health/stamina; FighterVisual — placeholder animation
 scripts/camera/    FighterCamera — behind-the-back camera, lock-on
 scripts/player/    PlayerController — connects input to fighter + camera
@@ -98,7 +84,8 @@ scripts/world/     Arena (generated in code), Pickup (fuel / ammo packs)
 scripts/fx/        FxDirector (gameplay events -> effects), Fx (sparks, flares, lights, dust),
                    SwordTrail, ScreenFx (motion blur, aberration, damage vignette); camera shake
                    lives in FighterCamera
-tests/             automated tests and screenshot tool
+tests/             automated tests and screenshot tools
+tools/             build.sh (desktop exports), blender/ (sword + character build scripts)
 ```
 
 ## 3D assets

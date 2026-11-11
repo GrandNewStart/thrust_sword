@@ -6,11 +6,11 @@ extends Node3D
 ## Aim mode (gun): pulls in tight over the right shoulder with a narrower FOV; lock-on is
 ## suspended (and restored afterwards) and the crosshair is the screen centre.
 
-@export var pivot_height := 2.0
+@export var pivot_height := 1.8
 @export var look_sensitivity := 0.006  # radians per pixel
 @export var min_pitch_deg := -55.0
 @export var max_pitch_deg := 30.0
-@export var default_pitch_deg := -14.0
+@export var default_pitch_deg := -10.0
 @export var lock_sharpness := 10.0
 @export var lock_pitch_bias_deg := -8.0
 ## Lock-on never tilts down more than this, so the horizon stays in view up close.
@@ -66,21 +66,6 @@ func setup(fighter: Node3D) -> void:
 	if fighter is CollisionObject3D:
 		_arm.add_excluded_object(fighter.get_rid())
 	_snap()
-
-
-## Portrait phones need a tall, wide-angle view with the fighter above the thumbs;
-## a landscape desktop window wants a normal FOV with the fighter nearer the middle.
-func configure_for(touch: bool) -> void:
-	if touch:
-		return  # scene defaults are tuned for portrait touch
-	camera.fov = 62.0
-	camera.v_offset = 0.0
-	pivot_height = 1.8
-	_arm.spring_length = 4.6
-	_arm.position.x = 0.75
-	default_pitch_deg = -10.0
-	pitch = deg_to_rad(default_pitch_deg)
-	_capture_base()
 
 
 func _capture_base() -> void:

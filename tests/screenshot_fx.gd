@@ -12,7 +12,6 @@ func _initialize() -> void:
 
 
 func _run() -> void:
-	InputMode.forced = InputMode.Kind.DESKTOP
 	vp = SubViewport.new()
 	vp.size = Vector2i(1280, 720)
 	vp.render_target_update_mode = SubViewport.UPDATE_ALWAYS

@@ -5,9 +5,6 @@ extends "res://tests/test_base.gd"
 var fx: ScreenFx
 
 
-func _input_kind() -> InputMode.Kind:
-	return InputMode.Kind.DESKTOP
-
 
 func _run() -> void:
 	await frames(20)

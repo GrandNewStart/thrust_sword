@@ -3,16 +3,11 @@ extends "res://tests/test_base.gd"
 ## lock-on suspended/restored, escape exits, swords without a gun.
 ## Run: godot --headless --path . -s tests/test_aim.gd
 
-var desktop: DesktopControls
 
-
-func _input_kind() -> InputMode.Kind:
-	return InputMode.Kind.DESKTOP
 
 
 func _run() -> void:
 	await frames(20)
-	desktop = main.get_node("DesktopControls")
 
 	# --- Toggle + planted + close-up camera ---
 	await _face_off()
@@ -81,17 +76,20 @@ func _run() -> void:
 		check(not player.aiming and did[exit], "%s leaves aim mode (and happens)" % exit)
 		mouse_button(MOUSE_BUTTON_RIGHT, false)
 
-	# --- Breaker: no gun, no aim mode, no AIM button ---
+	# --- Breaker: no gun, no aim mode ---
 	await _face_off()
 	player.apply_loadout(SwordDef.breaker(), ArmorDef.by_id(&"medium"))
 	await frames(2)
 	key_tap(KEY_F)
 	await frames(5)
 	check(not player.aiming, "Breaker: F does nothing")
-	check(controls.hidden_buttons.has(&"fire"), "Breaker: AIM button hidden")
 	player.apply_loadout(SwordDef.lancer(), ArmorDef.by_id(&"medium"))
 	await frames(2)
-	check(not controls.hidden_buttons.has(&"fire"), "Lancer: AIM button back")
+	key_tap(KEY_F)
+	await frames(5)
+	check(player.aiming, "Lancer: F aims again")
+	key_tap(KEY_F)
+	await frames(5)
 
 	# --- AI still fires from the hip ---
 	await _face_off()

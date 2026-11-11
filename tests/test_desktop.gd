@@ -1,18 +1,14 @@
 extends "res://tests/test_base.gd"
-## PoC2 check: keyboard + mouse produce the same gameplay as touch.
+## Controls check: movement, camera, lock-on, attacks, guard, jump, dash, aim and pause
+## through keyboard + mouse.
 ## Run: godot --headless --path . -s tests/test_desktop.gd
 
-var desktop: DesktopControls
 
-
-func _input_kind() -> InputMode.Kind:
-	return InputMode.Kind.DESKTOP
 
 
 func _run() -> void:
 	await frames(20)
-	desktop = main.get_node("DesktopControls")
-	check(desktop.enabled and not controls.enabled and not controls.visible, "desktop scheme active, touch layout hidden")
+	check(desktop.enabled, "keyboard + mouse active")
 
 	# --- WASD + Shift ---
 	await _face_off(10.0)

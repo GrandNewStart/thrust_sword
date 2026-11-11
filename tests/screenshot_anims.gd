@@ -17,7 +17,6 @@ func _run() -> void:
 	vp.size = Vector2i(400, 400)
 	vp.render_target_update_mode = SubViewport.UPDATE_ALWAYS
 	root.add_child(vp)
-	InputMode.forced = InputMode.Kind.TOUCH
 	var main: Node = load("res://scenes/main.tscn").instantiate()
 	(main.get_node("Session") as SessionManager).auto_start = false
 	vp.add_child(main)

@@ -3,19 +3,17 @@ extends "res://tests/test_base.gd"
 ## match end, results screen, rematch, setup flow and pickups resetting.
 ## Run: godot --headless --path . -s tests/test_step5.gd
 
-var pad: Vector2
 
 
 func _run() -> void:
 	await frames(20)
-	pad = Vector2(controls.size.x * 0.62, controls.size.y - 380)
 
 	# --- Start a match: intro freezes the fighters ---
 	manager.start_match()
 	await frames(5)
 	check(manager.phase == SessionManager.Phase.INTRO and manager.round_number == 1, "match starts with round 1 intro")
 	check(manager.banner == "ROUND 1", "intro banner (%s)" % manager.banner)
-	tap(1, pad)
+	click()
 	await frames(5)
 	check(player.state != Fighter.State.ATTACK, "can't attack during the intro")
 	await _wait_phase(SessionManager.Phase.FIGHT, 4.0)
@@ -28,7 +26,7 @@ func _run() -> void:
 	_put_in_range()
 	await frames(5)
 	opponent.health = 1.0
-	tap(1, pad)
+	click()
 	await frames(40)
 	check(manager.phase == SessionManager.Phase.ROUND_END and manager.banner == "K.O.", "K.O. ends the round")
 	check(Engine.time_scale < 1.0, "K.O. slow motion")
@@ -64,16 +62,16 @@ func _run() -> void:
 	_put_in_range()
 	await frames(5)
 	opponent.health = 1.0
-	tap(1, pad)
+	click()
 	await _wait_phase(SessionManager.Phase.MATCH_END, 8.0)
 	check(manager.match_result() == SessionManager.Outcome.PLAYER, "2 round wins = match won")
-	check(manager.result_panel.visible and not controls.enabled, "results screen shown, touch controls off")
+	check(manager.result_panel.visible and not manager.player_controller.desktop.enabled, "results screen shown, input off")
 
 	# --- Rematch ---
 	manager.result_panel.rematch_pressed.emit()
 	await frames(5)
 	check(manager.round_number == 1 and manager.player_wins == 0 and manager.phase == SessionManager.Phase.INTRO, "rematch restarts at round 1")
-	check(not manager.result_panel.visible and controls.enabled, "rematch hides results")
+	check(not manager.result_panel.visible and manager.player_controller.desktop.enabled, "rematch hides results, input on")
 
 	# --- Losing a match ---
 	for i in 2:
@@ -97,7 +95,7 @@ func _run() -> void:
 	opponent.health = 1.0
 	_put_in_range()
 	await frames(3)
-	tap(1, pad)
+	click()
 	await frames(200)
 	check(opponent.is_alive() and manager.phase == SessionManager.Phase.FIGHT, "TRAINING: K.O. just resets, no rounds")
 

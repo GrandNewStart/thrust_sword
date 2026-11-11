@@ -1,10 +1,10 @@
 class_name Movesets
 ## Attack sets. Keys match the attack names PlayerIntent sends.
 ##   light       tap — a 3-hit chain: light (swing left) → light_2 (swing right) → light_3 (poke)
-##   slash_left  swipe left  (blade sweeps right -> left)
-##   slash_right swipe right (blade sweeps left -> right)
-##   thrust      swipe up    (long lunging stab)
-##   smash       swipe down  (overhead, slow, strong)
+##   slash_left  flick left  (blade sweeps right -> left)
+##   slash_right flick right (blade sweeps left -> right)
+##   thrust      flick up    (long lunging stab)
+##   smash       flick down  (overhead, slow, strong)
 ##   heavy       hold, then release (charged; full charge breaks guard)
 ## Pose yaw: negative = blade pointing to the fighter's right, positive = left.
 

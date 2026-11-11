@@ -15,11 +15,9 @@ enum Outcome { NONE, PLAYER, OPPONENT, DRAW }
 @export var opponent: Fighter
 @export var brain: DummyBrain
 @export var camera_rig: FighterCamera
-@export var setup_button: Button
 @export var menu: LoadoutMenu
 @export var result_panel: ResultPanel
-@export var controls: TouchControls
-## Turns player input on/off around menus (touch or desktop, whichever is active).
+## Turns player input on/off around menus.
 @export var player_controller: PlayerController
 ## Open the SETUP menu on launch. Tests turn this off: training mode with built-in default stats.
 @export var auto_start := true
@@ -52,14 +50,9 @@ func _ready() -> void:
 	_opponent_start = opponent.global_transform
 	player.defeated.connect(_on_defeated)
 	opponent.defeated.connect(_on_defeated)
-	setup_button.pressed.connect(open_setup)
 	menu.confirmed.connect(_on_setup_confirmed)
 	result_panel.rematch_pressed.connect(start_match)
 	result_panel.setup_pressed.connect(open_setup)
-	controls.exclusion_controls.append(setup_button)
-	var top: float = SafeArea.insets(setup_button).top
-	setup_button.offset_top += top
-	setup_button.offset_bottom += top
 	if auto_start:
 		apply_setup()
 		open_setup.call_deferred()
@@ -75,10 +68,7 @@ func _unhandled_input(event: InputEvent) -> void:
 
 
 func _set_input(value: bool) -> void:
-	if player_controller:
-		player_controller.set_input_enabled(value)
-	else:
-		controls.enabled = value
+	player_controller.set_input_enabled(value)
 
 
 func open_setup() -> void:

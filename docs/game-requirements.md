@@ -1,12 +1,11 @@
 # Thrust Sword — Game Requirements v0.5
 
-> Status: **PoC complete.** PoC 1 (iOS touch) and PoC 2 (macOS keyboard + mouse) played identically;
-> desktop gives much more freedom, so **desktop is now the lead platform** (Windows, macOS, possibly Linux).
-> Next: refining the game on the desktop build. ✅ = decided · 💡 = proposed default (used unless changed) · ❓ = open
+> Status: **PoC complete; in production for PC and consoles.** Target stores: Steam (Windows, macOS,
+> Linux), PlayStation, Xbox, Nintendo. The mobile touch PoC is kept on the `mobile` branch only. ✅ = decided · 💡 = proposed default (used unless changed) · ❓ = open
 > All numbers (costs, damage, speeds) are starting points and will be tuned in playtesting.
 
 ## 1. Vision
-A 3D third-person action game for **mobile, played in portrait mode**. Two players duel with a giant
+A 3D third-person action game for **PC and consoles**. Two players duel with a giant
 high-tech sword that is also their way of moving, attacking and defending. Matches are won by skill,
 speed and intuition. The controls take patience to learn and have a high skill ceiling.
 
@@ -14,11 +13,11 @@ speed and intuition. The controls take patience to learn and have a high skill c
 1. **One weapon, many roles.** The sword is a blade, a thruster, a gun and a shield.
 2. **Mastery over stats.** Customization changes *how* you play, not *how strong* you are.
 3. **Speed and commitment.** Burst movement where every dash commits you.
-4. **Deep controls that fit two thumbs.** Skill comes from combining simple inputs, not from more buttons.
+4. **Deep controls from few inputs.** Skill comes from combining simple inputs, not from more buttons.
 
 ## 3. PoC Goals ✅
 The PoC must prove two things:
-1. A **mobile portrait interface** can support a PvP action game with deep controls.
+1. A **mobile portrait interface** (PoC 1; now on the `mobile` branch) can support a PvP action game with deep controls.
 2. **Hyper-action combat** with a sword-thruster weapon is fun and worth exploring further.
 
 The PoC opponent is an **AI**. Real player-vs-player (online) is the next phase after the PoC.
@@ -27,49 +26,34 @@ The PoC opponent is an **AI**. Real player-vs-player (online) is the next phase 
 | Item | Decision |
 |---|---|
 | Engine | Godot 4 (GDScript) |
-| Platform | **Desktop first** (Windows, macOS, possibly Linux), keyboard + mouse, landscape. iOS portrait touch kept as a secondary build |
-| Grip | **Two thumbs** |
-| Dev testing | 💡 Desktop build with mouse emulating touch, plus regular builds on a real device |
+| Platform | **PC (Steam: Windows, macOS, Linux) and consoles (PlayStation, Xbox, Nintendo)**, landscape 16:9 |
+| Input | Keyboard + mouse now; gamepad required for consoles (❓ next). Mobile touch: `mobile` branch only |
+| Consoles | ❓ Need each platform's developer program + SDK, or a porting partner (Godot has no public console export) |
 | Art | 💡 Simple placeholder shapes and basic materials for the PoC; Halo-style sci-fi direction later |
 | Architecture | 💡 Keep game logic separate from input and rendering, so online play can be added in the next phase |
 
 ## 5. Camera & Targeting ✅
 - **Default:** camera fixed behind the character (like Marvel Rivals or Deadlock). Rotating the camera also turns the character to face that way.
-- **Camera control:** drag on the right gesture pad (when not locked on).
-- **Lock-on:** tap the opponent in the game view.
-- **Release lock-on:** double-tap an empty area of the screen.
+- **Camera control:** mouse (when not locked on).
+- **Lock-on:** Tab / middle mouse locks onto the opponent nearest the screen centre; press again to release.
 
-## 6. Controls (Portrait, Two Thumbs) ✅
-```
-┌─────────────────────┐
-│                     │
-│     Game view       │  tap opponent      = lock-on
-│   (top ~60%)        │  double-tap empty  = release lock-on
-│                     │
-├──────────┬──────────┤
-│  LEFT    │  RIGHT   │
-│ joystick │ gesture  │
-│  = move  │  pad     │
-│          │ [GUARD]  │
-│          │ [FIRE]   │
-│          │ [JUMP]💡 │
-└──────────┴──────────┘
-```
+## 6. Controls (Keyboard + Mouse) ✅
 | Input | Action |
 |---|---|
-| Left: floating joystick | Move. Push to the edge to run (💡). |
-| Left: double-flick | Thrust dash in that direction (needs fuel) |
-| Right pad: tap | Light swing |
-| Right pad: swipe | Directional slash (swipe direction picks the attack) |
-| Right pad: hold, then release | Charged heavy attack |
-| Right pad: drag | Camera rotation (when not locked on) |
-| Guard: hold | Block |
-| Guard: tap just before a hit | Parry (only on swords that support it) |
-| Aim toggle ✅ | **Manual aim mode** for the secondary weapon: position fixed, close-up over-the-shoulder camera, crosshair moved by hand (mouse / left stick), trigger = LMB / attack pad. No auto-aim or lock-on while aiming. Hidden for swords without a gun (Breaker). Jump, dash, guard or being hit exit it |
-| Jump ✅ | Jump (holding does nothing extra). Press again in the air with a flight-capable thruster: **vertical dash**, a one-time upward boost that uses fuel and shares the air-dash limit. |
+| WASD · Shift | Move · run |
+| Double-tap WASD · C | Thrust dash in that direction · in the movement direction (needs fuel) |
+| LMB click | Light swing (3-hit chain) |
+| LMB + quick flick | Directional slash (flick direction picks the attack: ←/→ slash, ↑ thrust, ↓ smash) |
+| LMB hold, then release | Charged heavy attack |
+| Mouse | Camera rotation (when not locked on) |
+| RMB hold | Block |
+| RMB tap just before a hit | Parry (only on swords that support it) |
+| F (aim toggle) ✅ | **Manual aim mode** for the secondary weapon: position fixed, close-up over-the-shoulder camera, crosshair moved by the mouse, LMB fires. No auto-aim or lock-on while aiming. Not available on swords without a gun (Breaker). Jump, dash, guard or being hit exit it |
+| Space ✅ | Jump (holding does nothing extra). Press again in the air with a flight-capable thruster: **vertical dash**, a one-time upward boost that uses fuel and shares the air-dash limit. |
+| Esc | Setup menu |
 
-**Combos from mixed inputs:** e.g. swipe during a dash = dash-slash (only on thrusters that allow mid-dash attacks).
-Exact gesture thresholds (swipe length, hold time, flick speed) are to be tuned on a device.
+**Combos from mixed inputs:** e.g. flick during a dash = dash-slash (only on thrusters that allow mid-dash attacks).
+❓ Gamepad layout (needed for consoles) — to be designed; it fills the same PlayerIntent, so gameplay code doesn't change.
 
 ## 7. Resources ✅
 | Resource | Regenerates? | Used for | Refill |
@@ -144,13 +128,10 @@ Armor type sets the pace of the fight. Any armor can be paired with any sword.
 - ✅ Loadouts for both sides and the AI mode are chosen in the in-game SETUP menu.
 - ✅ AI uses the same sword, armor and resource rules as the player.
 
-## 11b. PoC 2 — macOS Desktop ✅
-Goal: compare the **exact same gameplay** on desktop. Same codebase and game logic; only the
-front-end differs (input scheme, landscape layout, camera FOV, renderer).
-- Keyboard + mouse produce the same PlayerIntent as touch. The left mouse button reuses the touch
-  attack-pad gestures (click / flick / hold), so attack selection works identically.
-- Landscape 16:9 window, centred HUD column, side-by-side SETUP menu, Forward+ renderer.
-- Built as `build/macos/ThrustSword.app` (ad-hoc signed, for local testing).
+## 11b. Platform history ✅
+- PoC 1 ran on iOS (portrait, two-thumb touch); PoC 2 on macOS (keyboard + mouse) with identical gameplay.
+  Desktop gave much more freedom, so PC/console became the lead and the touch build moved to the `mobile` branch.
+- Builds: `tools/build.sh macos|windows|linux|all` (macOS is ad-hoc signed, for local testing).
 
 ## 12. Out of Scope for PoC
 - Online PvP (next phase)

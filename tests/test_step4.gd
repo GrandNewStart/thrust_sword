@@ -2,12 +2,10 @@ extends "res://tests/test_base.gd"
 ## Step 4 check: sword presets, armor, sword-specific guard rules, SPAR AI, setup menu.
 ## Run: godot --headless --path . -s tests/test_step4.gd
 
-var pad: Vector2
 
 
 func _run() -> void:
 	await frames(20)
-	pad = Vector2(controls.size.x * 0.62, controls.size.y - 380)
 
 	# --- Presets change stats ---
 	player.apply_loadout(SwordDef.striker(), ArmorDef.by_id(&"light"))
@@ -27,37 +25,37 @@ func _run() -> void:
 	await _face_off(SwordDef.breaker(), &"medium", SwordDef.lancer(), &"medium")
 	brain.mode = DummyBrain.Mode.BLOCK
 	await frames(20)
-	touch(1, pad, true)
+	mouse_button(MOUSE_BUTTON_LEFT, true)
 	await frames(20)  # just past the hold threshold = barely charged
-	touch(1, pad, false)
+	mouse_button(MOUSE_BUTTON_LEFT, false)
 	await frames(40)
 	check(opponent.health < 80.0, "breaker uncharged heavy breaks guard (health %.1f)" % opponent.health)
 
 	# --- Striker: small blade, a strong hit crushes its guard ---
 	await _face_off(SwordDef.striker(), &"medium", SwordDef.breaker(), &"medium")
-	touch(2, controls.button_center(&"guard"), true)
+	mouse_button(MOUSE_BUTTON_RIGHT, true)
 	await frames(20)  # past the parry window: plain block
 	opponent.request_attack(&"slash_left")  # 12 * 1.45 = 17.4 > striker's block limit 14
 	await frames(50)
-	touch(2, controls.button_center(&"guard"), false)
+	mouse_button(MOUSE_BUTTON_RIGHT, false)
 	check(is_equal_approx(player.health, 100.0 - 17.4 * 0.5), "striker guard crushed by big hit: half damage (health %.1f)" % player.health)
 
 	# --- Breaker blocks the same hit for chip only ---
 	await _face_off(SwordDef.breaker(), &"medium", SwordDef.breaker(), &"medium")
-	touch(2, controls.button_center(&"guard"), true)
+	mouse_button(MOUSE_BUTTON_RIGHT, true)
 	await frames(20)
 	opponent.request_attack(&"slash_left")
 	await frames(50)
-	touch(2, controls.button_center(&"guard"), false)
+	mouse_button(MOUSE_BUTTON_RIGHT, false)
 	check(player.health > 98.5, "breaker blocks big hit, chip only (health %.1f)" % player.health)
 
 	# --- Breaker can't parry ---
 	await _face_off(SwordDef.breaker(), &"medium", SwordDef.lancer(), &"medium")
 	opponent.request_attack(&"slash_left")
 	await frames(6)
-	touch(2, controls.button_center(&"guard"), true)
+	mouse_button(MOUSE_BUTTON_RIGHT, true)
 	await frames(30)
-	touch(2, controls.button_center(&"guard"), false)
+	mouse_button(MOUSE_BUTTON_RIGHT, false)
 	check(opponent.state != Fighter.State.STAGGER and player.health < 100.0, "breaker: well-timed guard is only a block")
 
 	# --- Armor scales damage taken ---
@@ -65,7 +63,7 @@ func _run() -> void:
 	opponent.request_attack(&"slash_left")
 	await frames(40)
 	check(is_equal_approx(player.health, 140.0 - 12.0 * 0.75), "heavy armor takes 75%% (health %.1f)" % player.health)
-	tap(1, pad)
+	click()
 	await frames(40)
 	check(is_equal_approx(opponent.health, 85.0 - 8.0 * 1.15), "light armor takes 115%% (health %.1f)" % opponent.health)
 

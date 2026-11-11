@@ -1,14 +1,14 @@
 class_name DesktopControls
 extends Node
-## Keyboard + mouse controls. Produces the same PlayerIntent as TouchControls, so the
-## gameplay is identical; only the way you express it changes.
+## Keyboard + mouse controls. Fills a PlayerIntent; the player controller turns that into
+## fighter orders.
 ##
 ##   WASD            move            Shift  run
 ##   double-tap WASD thrust dash     C      dash toward the movement direction
 ##   Space           jump; press again in the air = vertical dash (boost)
 ##   Mouse           camera (while not locked on)
 ##   LMB click       light attack
-##   LMB + flick     directional slash (← → slashes, ↑ thrust, ↓ smash) — like a swipe
+##   LMB + flick     directional slash (← → slashes, ↑ thrust, ↓ smash)
 ##   LMB hold        charge heavy, release to strike
 ##   RMB             guard (hold) / parry (tap just before a hit)
 ##   F               toggle aim mode (gun): planted, close-up camera, mouse = crosshair,
@@ -17,10 +17,10 @@ extends Node
 ## Key state is tracked from events (not the global Input singleton), so tests can drive it.
 
 @export var mouse_sensitivity := 0.35
-## Mouse gesture thresholds (in mouse pixels) — mirror the touch pad's tap / swipe / hold.
+## Mouse gesture thresholds (in mouse pixels) for click / flick / hold on the left button.
 @export var tap_max_move := 12.0
-@export var swipe_min_distance := 40.0
-@export var swipe_max_time := 0.3
+@export var flick_min_distance := 40.0
+@export var flick_max_time := 0.3
 @export var hold_time := 0.28
 @export var double_tap_time := 0.25
 
@@ -90,7 +90,7 @@ func _input(event: InputEvent) -> void:
 		_on_mouse_button(event.button_index, event.pressed)
 	elif event is InputEventMouseMotion:
 		if _lmb_down and not aiming:
-			_lmb_delta += event.relative  # gesture, like a swipe on the touch pad: camera holds still
+			_lmb_delta += event.relative  # attack gesture: the camera holds still meanwhile
 		else:
 			intent.look_delta += event.relative * mouse_sensitivity
 
@@ -140,13 +140,13 @@ func _on_mouse_button(button: MouseButton, pressed: bool) -> void:
 				intent.lock_toggle = true
 
 
-## Left button released: decide light / slash / heavy, exactly like the touch attack pad.
+## Left button released: click = light, quick flick = directional slash, hold = heavy.
 func _resolve_gesture() -> void:
 	var age := _now() - _lmb_time
 	if _charging:
 		_charging = false
 		intent.charge_held = false
-	elif age <= swipe_max_time and _lmb_delta.length() >= swipe_min_distance:
+	elif age <= flick_max_time and _lmb_delta.length() >= flick_min_distance:
 		var d := _lmb_delta
 		if absf(d.x) >= absf(d.y):
 			intent.attacks.append(&"slash_right" if d.x > 0.0 else &"slash_left")
