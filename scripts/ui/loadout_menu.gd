@@ -13,8 +13,12 @@ var ai_mode := DummyBrain.Mode.SPAR
 var mode := SessionManager.Mode.MATCH
 
 var _desc_labels := {}  # side -> Label
-## Landscape screens show YOU and OPPONENT side by side with shorter buttons.
+## Wide windows show YOU and OPPONENT side by side; narrow ones stack them (and scroll).
 var _wide := false
+## Below this width (in UI units) the two sides stack.
+const WIDE_MIN_WIDTH := 1000.0
+## The menu never grows wider than this, so it stays readable on big screens.
+const MAX_WIDTH := 1200.0
 
 
 func _ready() -> void:
@@ -22,6 +26,13 @@ func _ready() -> void:
 	set_anchors_preset(Control.PRESET_FULL_RECT)
 	mouse_filter = Control.MOUSE_FILTER_STOP
 	visible = false
+	get_viewport().size_changed.connect(_on_resized)
+
+
+## Rebuild for the new window size; selections live in the vars above, so nothing is lost.
+func _on_resized() -> void:
+	if visible:
+		_build()
 
 
 func open() -> void:
@@ -38,23 +49,35 @@ func _build() -> void:
 	bg.set_anchors_preset(Control.PRESET_FULL_RECT)
 	add_child(bg)
 
+	var screen := get_viewport_rect().size
+	_wide = screen.x >= WIDE_MIN_WIDTH
+	var gutter := clampf(screen.x * 0.04, 16.0, 48.0)
+	var side := int(maxf(gutter, (screen.x - MAX_WIDTH) * 0.5))
+	var vgap := int(clampf(screen.y * 0.03, 12.0, 32.0))
 	var margin := MarginContainer.new()
 	margin.set_anchors_preset(Control.PRESET_FULL_RECT)
-	var screen := get_viewport_rect().size
-	_wide = screen.x > screen.y
-	var max_w := 1100.0 if _wide else 760.0
-	var side := int(maxf(28.0, (screen.x - max_w) * 0.5))
 	margin.add_theme_constant_override("margin_left", side)
 	margin.add_theme_constant_override("margin_right", side)
-	margin.add_theme_constant_override("margin_top", int((20 if _wide else 40)))
-	margin.add_theme_constant_override("margin_bottom", int(30))
+	margin.add_theme_constant_override("margin_top", vgap)
+	margin.add_theme_constant_override("margin_bottom", vgap)
 	add_child(margin)
 
-	var col := VBoxContainer.new()
-	col.add_theme_constant_override("separation", 8 if _wide else 14)
-	margin.add_child(col)
+	# Title on top, FIGHT pinned at the bottom, everything else scrolls if the window is short.
+	var outer := VBoxContainer.new()
+	outer.add_theme_constant_override("separation", 10)
+	margin.add_child(outer)
+	outer.add_child(_label("SETUP", 34, Color(1, 1, 1)))
 
-	col.add_child(_label("SETUP", 34, Color(1, 1, 1)))
+	var scroll := ScrollContainer.new()
+	scroll.size_flags_vertical = Control.SIZE_EXPAND_FILL
+	scroll.horizontal_scroll_mode = ScrollContainer.SCROLL_MODE_DISABLED
+	outer.add_child(scroll)
+
+	var col := VBoxContainer.new()
+	col.size_flags_horizontal = Control.SIZE_EXPAND_FILL
+	col.add_theme_constant_override("separation", 8)
+	scroll.add_child(col)
+
 	col.add_child(_choice_row([SessionManager.Mode.MATCH, SessionManager.Mode.TRAINING],
 		["MATCH  (best of 3)", "TRAINING"], mode, func(v): mode = v))
 	if _wide:
@@ -79,14 +102,10 @@ func _build() -> void:
 		ai_names.append(DummyBrain.mode_name(m))
 	col.add_child(_choice_row(ai_ids, ai_names, ai_mode, func(v): ai_mode = v))
 
-	var spacer := Control.new()
-	spacer.size_flags_vertical = Control.SIZE_EXPAND_FILL
-	col.add_child(spacer)
-
 	var fight := Button.new()
 	fight.text = "FIGHT"
-	fight.custom_minimum_size = Vector2(0, 70 if _wide else 110)
-	fight.add_theme_font_size_override("font_size", 38)
+	fight.custom_minimum_size = Vector2(0, clampf(screen.y * 0.09, 52.0, 80.0))
+	fight.add_theme_font_size_override("font_size", 34)
 	fight.focus_mode = Control.FOCUS_NONE
 	var solid := StyleBoxFlat.new()
 	solid.bg_color = Color(0.95, 0.5, 0.15)
@@ -99,7 +118,7 @@ func _build() -> void:
 	fight.add_theme_color_override("font_color", Color.WHITE)
 	fight.add_theme_color_override("font_hover_color", Color.WHITE)
 	fight.pressed.connect(_confirm)
-	col.add_child(fight)
+	outer.add_child(fight)
 
 
 func _side(col: VBoxContainer, side: StringName, title: String, color: Color) -> void:
@@ -112,7 +131,7 @@ func _side(col: VBoxContainer, side: StringName, title: String, color: Color) ->
 
 	var desc := _label(SwordDef.by_id(current_sword).description, 17, Color(0.75, 0.8, 0.85))
 	desc.autowrap_mode = TextServer.AUTOWRAP_WORD_SMART
-	desc.custom_minimum_size = Vector2(0, 50)
+	desc.custom_minimum_size = Vector2(0, 46)
 	col.add_child(desc)
 	_desc_labels[side] = desc
 
@@ -121,7 +140,7 @@ func _side(col: VBoxContainer, side: StringName, title: String, color: Color) ->
 		var a := ArmorDef.by_id(id)
 		armor_names.append("%s\n%d HP · %s" % [a.display_name, a.max_health, a.tagline])
 	var current_armor: StringName = player_armor if side == &"player" else opponent_armor
-	col.add_child(_choice_row(ArmorDef.IDS, armor_names, current_armor, func(v): _set_armor(side, v)))
+	col.add_child(_choice_row(ArmorDef.IDS, armor_names, current_armor, func(v): _set_armor(side, v), 18))
 
 
 func _set_sword(side: StringName, id: StringName) -> void:
@@ -139,7 +158,9 @@ func _set_armor(side: StringName, id: StringName) -> void:
 		opponent_armor = id
 
 
-func _choice_row(ids: Array, names: Array, current: Variant, on_pick: Callable) -> HBoxContainer:
+## Buttons share the row width and wrap their text, so a row never forces the menu wider
+## than the window.
+func _choice_row(ids: Array, names: Array, current: Variant, on_pick: Callable, font_size := 22) -> HBoxContainer:
 	var row := HBoxContainer.new()
 	row.add_theme_constant_override("separation", 10)
 	var group := ButtonGroup.new()
@@ -150,9 +171,10 @@ func _choice_row(ids: Array, names: Array, current: Variant, on_pick: Callable) 
 		b.button_group = group
 		b.button_pressed = ids[i] == current
 		b.focus_mode = Control.FOCUS_NONE
-		b.custom_minimum_size = Vector2(0, 54 if _wide else 76)
+		b.custom_minimum_size = Vector2(0, 52)
 		b.size_flags_horizontal = Control.SIZE_EXPAND_FILL
-		b.add_theme_font_size_override("font_size", 22)
+		b.autowrap_mode = TextServer.AUTOWRAP_WORD_SMART
+		b.add_theme_font_size_override("font_size", font_size)
 		_style_choice(b)
 		var id = ids[i]
 		b.pressed.connect(func(): on_pick.call(id))
