@@ -37,6 +37,8 @@ const CHARGE_TWIST := 0.3
 const LEVELLED_ATTACKS: Array[StringName] = [&"light_3", &"thrust"]
 var _grip_rest := Transform3D.IDENTITY
 var _blade_aim := 0.0
+var _frame_delta := 0.0
+var _hand_bone := -1
 var _nozzle: Node3D
 var _tip: Node3D
 var _trail: SwordTrail
@@ -67,6 +69,10 @@ func _ready() -> void:
 		holder.reparent(_char.hand, false)
 		holder.transform = CharacterAnimator.grip_transform()
 		_grip_rest = holder.transform
+		# Re-aim the blade right after each pose update, so it uses this frame's hand (a frame
+		# late, the blade wobbles off level during fast swings).
+		_hand_bone = _char.skeleton.find_bone(CharacterAnimator.HAND_BONE)
+		_char.skeleton.skeleton_updated.connect(func(): _update_blade_aim(_frame_delta))
 		var team_tint := Color.WHITE.lerp(fighter.body_color.lightened(0.35), 0.5)
 		_flash_mats = _char.tint(team_tint)
 		_set_sword_model(&"lancer")  # until a loadout picks one: never show the placeholder slab in hand
@@ -167,7 +173,7 @@ func _process(delta: float) -> void:
 		_update_placeholder_pose(delta)
 	else:
 		_update_lean(delta)
-		_update_blade_aim(delta)
+		_frame_delta = delta
 	_update_effects(delta)
 	_update_trail()
 	_update_charge_fx()
@@ -252,7 +258,21 @@ func _update_blade_aim(delta: float) -> void:
 	var want := 0.0
 	var aim := fighter.forward()
 	var a := fighter.current_attack
-	if fighter.state == Fighter.State.ATTACK and a and LEVELLED_ATTACKS.has(a.name):
+	var sweep := ""  # horizontal swing ("left" / "right"): keep the blade's direction, flatten it
+	if fighter.state == Fighter.State.ATTACK and a and _char \
+			and CharacterAnimator.ATTACK_STYLE.get(a.name, {}).has("level_blade"):
+		sweep = CharacterAnimator.ATTACK_STYLE[a.name].level_blade
+		var t := fighter.attack_time
+		if t < a.windup:
+			# Late in the windup only: early on the blade may still be raised near vertical,
+			# where flattening it would swing it round to point anywhere.
+			want = smoothstep(0.7, 1.0, t / a.windup)
+		elif t < a.windup + a.active:
+			want = 1.0
+		else:
+			want = 1.0 - smoothstep(0.0, 1.0, (t - a.windup - a.active) / a.recovery)
+		_blade_aim = want
+	elif fighter.state == Fighter.State.ATTACK and a and LEVELLED_ATTACKS.has(a.name):
 		var t := fighter.attack_time
 		if t < a.windup:
 			want = ease(t / a.windup, 0.6)
@@ -262,6 +282,10 @@ func _update_blade_aim(delta: float) -> void:
 			want = 1.0 - smoothstep(0.0, 1.0, (t - a.windup - a.active) / a.recovery)
 		_blade_aim = want  # follows the attack's own timing exactly
 		aim = (aim + Vector3.DOWN * 0.08).normalized()
+	elif fighter.state == Fighter.State.DASH and _char:
+		# Blade along the dash, so the bottom-end thruster fires the other way.
+		aim = _char.dash_blade_aim()
+		_blade_aim = move_toward(_blade_aim, 1.0, delta * 14.0)
 	else:
 		if fighter.state == Fighter.State.FREE and (fighter.aiming or fighter.since_shot < 0.3):
 			want = 1.0
@@ -272,11 +296,23 @@ func _update_blade_aim(delta: float) -> void:
 	if _blade_aim <= 0.001:
 		_holder.transform = _grip_rest
 		return
-	# Target: blade (+Y) along the aim, front edge (-Z) facing down.
-	var y := aim
-	var z := (Vector3.UP - y * y.dot(Vector3.UP)).normalized()
-	var target := Basis(y.cross(z).normalized(), y, z)
-	var hand_basis := _char.hand.global_basis.orthonormalized()
+	var sk := _char.skeleton
+	var hand_basis := (sk.global_basis * sk.get_bone_global_pose(_hand_bone).basis).orthonormalized()
+	var target: Basis
+	if sweep != "":
+		# Blade (+Y) where the clip points it, but level; front edge (-Z) leads the swing
+		# (UP x blade points to the left of the blade, i.e. along a right -> left sweep).
+		var natural := hand_basis * _grip_rest.basis.orthonormalized()
+		var y := Vector3(natural.y.x, 0.0, natural.y.z).normalized()
+		var lead := Vector3.UP.cross(y).normalized() * (1.0 if sweep == "left" else -1.0)
+		var z := -lead
+		target = Basis(y.cross(z).normalized(), y, z)
+	else:
+		# Blade (+Y) along the aim, front edge (-Z) facing down (forward, if aimed straight up).
+		var y := aim
+		var ref := Vector3.UP if absf(y.dot(Vector3.UP)) < 0.95 else -fighter.forward()
+		var z := (ref - y * y.dot(ref)).normalized()
+		target = Basis(y.cross(z).normalized(), y, z)
 	var local_target := Quaternion(hand_basis.inverse() * target)
 	var rest_rot := _grip_rest.basis.get_rotation_quaternion()
 	var rot := rest_rot.slerp(local_target.normalized(), _blade_aim)
@@ -397,12 +433,8 @@ func _aim_flame() -> void:
 	if _nozzle == null or _char == null:
 		_flame.transform = _flame_rest
 		return
-	var push := Vector3.UP
-	if fighter.state == Fighter.State.DASH:
-		push = fighter.dash_dir
-	elif is_thrust_lunge():
-		push = fighter.forward()
-	var y := push.normalized()  # flame mesh: wide end at +Y (nozzle), tip along -Y
+	# Straight out of the sword's bottom end: along the sword, away from the blade.
+	var y := _holder.global_basis.y.normalized()  # flame mesh: wide end at +Y (nozzle), tip along -Y
 	var x := y.cross(Vector3.FORWARD if absf(y.dot(Vector3.FORWARD)) < 0.9 else Vector3.RIGHT).normalized()
 	var basis := Basis(x, y, x.cross(y).normalized())
 	var scale := _flame.global_basis.get_scale()

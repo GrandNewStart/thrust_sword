@@ -34,11 +34,14 @@ const BLADE_DIR := Vector3(0.56, -0.25, -0.78)
 const EDGE_DIR := Vector3(-0.82, -0.09, -0.56)
 
 ## Attack name -> clip and clip times (s): start, contact (fastest point of the swing), end.
-## The game's active (hit) window is mapped around the contact time.
+## The game's active (hit) window is mapped around the contact time. An end before the start
+## plays the clip backwards (a swing reversed into the opposite direction).
 const ATTACK_CLIPS := {
-	# Light chain: the spin-kick clip's two sweeps (the kick between them is skipped), then a poke.
-	&"light": ["gs_kick", 0.10, 0.37, 0.62],     # swing to the left (right -> left)
-	&"light_2": ["gs_kick", 0.85, 1.20, 1.50],   # swing to the right (left -> right)
+	# Light chain: a sweep to the left, a sweep back to the right, then a poke.
+	&"light": ["gs_kick", 0.12, 0.40, 0.66],     # spin-kick clip's first sweep (right -> left)
+	# Light 1's swing played backwards: the same level, upright sweep, left -> right, starting
+	# from exactly the pose light 1 ends in.
+	&"light_2": ["gs_kick", 0.66, 0.40, 0.12],
 	&"light_3": ["spear_stab", 0.00, 0.40, 1.00],  # forward poke (blade levelled by FighterVisual)
 	&"slash_left": ["gs_power_slash", 0.30, 0.77, 1.50],
 	&"slash_right": ["gs_high_spin", 0.62, 0.92, 1.25],  # left -> right sweep
@@ -47,8 +50,34 @@ const ATTACK_CLIPS := {
 	# Starts from the wound-up frame the charge pose ends on (blade drawn behind), so the
 	# release flows straight into the combo slash's big behind-to-front sweep.
 	&"heavy": ["gs_combo_slash", 0.40, 0.80, 1.20],
+	# Not in a moveset yet — kept for a future skill: the spin-kick clip's second sweep, a full
+	# 360° spin that sweeps all the way around (it used to be light 2). Full body: the kick
+	# leg is still in it.
+	&"spin_slash": ["gs_kick", 0.85, 1.20, 1.50],
 }
 const CONTACT_HALF_WIDTH := 0.12
+## Per-attack adjustments on top of the clip:
+##   legs — [clip, from, to]: the attack clip drives only the upper body; the legs scrub this
+##          clip from -> to over windup + active (a step in), then hold it through recovery
+##   contact_half — half the clip time (s) mapped onto the active window (default
+##          CONTACT_HALF_WIDTH); smaller for very fast clips, so the hit covers just the sweep
+##   hips — share of the attack clip's own hip turn the waist carries (default 1)
+##   turn — degrees of extra turn at the waist (positive = to the left) built up over the
+##          active window and held through the recovery (it eases off with the attack pose),
+##          to carry a sweep further across. [from, to]: held at `from` in the windup instead
+##          of 0 (e.g. picking up where the previous attack's turn left off)
+##   roll, bow — degrees of sideways lean (positive = to the right) and forward bend
+##          (positive = forward), around the body's own axes: built early in the windup, held
+##          through the attack, eased off after it
+##   level_blade — "left" / "right": the sword is turned in the hands to keep the blade
+##          horizontal through a sweep in that direction, cutting edge leading (FighterVisual)
+const ATTACK_STYLE := {
+	# Light 1: the spin-kick sweep slants and its legs kick; keep its upper body (with its hip
+	# turn), level the blade, and swap the legs for a short step in with the left foot.
+	&"light": { "legs": ["legs_walk_fwd", 0.07, 0.30], "level_blade": "left", "turn": 30.0 },
+	# Light 2: the legs carry on the walk stride from light 1 (right foot comes forward).
+	&"light_2": { "legs": ["legs_walk_fwd", 0.30, 0.80], "level_blade": "right", "turn": [30.0, -30.0] },
+}
 
 ## Legs: radius 1 = walk, 2 = jog, 3 = run.
 const LEG_POINTS := {
@@ -76,13 +105,28 @@ const STRIDES := [
 	{ "fwd": 4.1, "back": 3.1, "side": 3.8 },  # run
 ]
 const LAYERS := ["U", "F"]
-## Dash pose: frames of the guard stance (braced legs) and the stab (blade thrust forward).
+## Dash pose: legs from this frame of the guard stance (braced).
 const DASH_STANCE_TIME := 0.3
-const DASH_THRUST_TIME := 0.4
+## Dash poses by direction (relative to the fighter's facing). The thruster is in the sword's
+## bottom end, so the blade points the way you dash and the thrust fires back from the pommel.
+##   pose — [clip, time]: the upper body's frame (legs: the braced stance; tucked when rising)
+##   hips — share of that clip's own hip turn the waist carries (as for attacks)
+##   turn — extra waist turn (degrees, positive = to the left)
+##   aim  — where the blade points (fighter frame: -Z ahead, +X right); the sword is turned in
+##          the hands to match it exactly (FighterVisual)
+static var DASH_POSES := {
+	# Charging in, sword tucked low and held tight, blade ahead: thrust out behind.
+	"forward": { "pose": ["gs_power_slash", 1.60], "hips": 0.0, "aim": Vector3(0, -0.2, -1) },
+	# Sword up on the shoulder, blade back: thrust out in front.
+	"back": { "pose": ["gs_combo_slash", 2.47], "hips": 0.0, "aim": Vector3(0, 0.75, 1) },
+	# Held across the body: blade out to the side you dash to, thrust out the other side.
+	"left": { "pose": ["gs_kick", 1.07], "hips": 1.0, "aim": Vector3(-1, 0.05, -0.15) },
+	"right": { "pose": ["gs_run", 0.27], "hips": 0.0, "aim": Vector3(1, 0.05, -0.15) },
+	# Vertical dash: sword held upright in front, thrust straight down.
+	"up": { "pose": ["gs_combo_slash", 1.60], "hips": 0.0, "aim": Vector3.UP },
+}
 ## Charge wind-up: combo-slash frames drawing the blade from the front-right to behind the body.
 const CHARGE_WINDUP_TIME := Vector2(0.17, 0.40)
-## Frame of the great-sword run with the blade over the shoulder (for backward dashes).
-const DASH_BACK_TIME := 0.15
 ## Bones from here up belong to the upper body.
 const UPPER_ROOT_BONE := "mixamorig_Spine"
 const RIGHT_ARM_ROOT := "mixamorig_RightShoulder"
@@ -119,6 +163,11 @@ var _blocked_hit_time := 99.0
 ## Stunned straight out of an attack (parried / interrupted): use the bigger head-snap reaction.
 var _parried := false
 var _was_attacking := false
+var _bend: SpineBend
+## Upper-body clip + time whose hip turn the spine should carry (stepping attacks), or [].
+var _hip_turn_from: Array = []
+var _hips_tracks := {}  # clip -> rotation track index of the hips
+var _hip_share := 1.0
 
 
 ## Returns null if the character files aren't there (e.g. a fresh clone without Mixamo assets).
@@ -141,6 +190,10 @@ func _build(parent: Node3D) -> void:
 	skeleton = model.find_children("*", "Skeleton3D", true, false)[0]
 	_player = model.find_children("*", "AnimationPlayer", true, false)[0]
 	_player.playback_active = false
+
+	_bend = SpineBend.new()
+	_bend.name = "SpineBend"
+	skeleton.add_child(_bend)
 
 	hand = BoneAttachment3D.new()
 	hand.name = "RightHand"
@@ -300,6 +353,14 @@ func _process(delta: float) -> void:
 
 	# Actions: { "F": [clip, time] full body, "U": [clip, time] upper body } — either may be absent.
 	var action := _action()
+	if fighter.state == Fighter.State.ATTACK:
+		_hip_turn_from = action.U if action.has("U") else []
+		_hip_share = ATTACK_STYLE.get(fighter.current_attack.name, {}).get("hips", 1.0) if fighter.current_attack else 1.0
+	elif fighter.state == Fighter.State.DASH and DASH_POSES.has(dash_key()):
+		_hip_share = DASH_POSES[dash_key()].get("hips", 0.0)
+		_hip_turn_from = action.U if action.has("U") and _hip_share > 0.0 else []
+	elif _upper_blend <= 0.001:
+		_hip_turn_from = []
 	for layer in LAYERS:
 		if action.has(layer):
 			_show(layer, action[layer][0], action[layer][1])
@@ -312,6 +373,16 @@ func _process(delta: float) -> void:
 	_upper_blend = move_toward(_upper_blend, want_upper, delta * (14.0 if want_upper > _upper_blend else 8.0))
 	_tree.set("parameters/full/blend_amount", _full_blend)
 	_tree.set("parameters/upper/blend_amount", _upper_blend)
+	if not _hip_turn_from.is_empty():
+		_bend.hips_source = _clip_hips(_hip_turn_from[0], _hip_turn_from[1])
+	_bend.hips_weight = _upper_blend * _hip_share if not _hip_turn_from.is_empty() else 0.0
+	# Eased, so the turn lets go smoothly as the attack pose blends out (and into a follow-up).
+	var turn := _attack_turn()
+	if fighter.state == Fighter.State.DASH and DASH_POSES.has(dash_key()):
+		turn = DASH_POSES[dash_key()].get("turn", 0.0)
+	_bend.turn = move_toward(_bend.turn, deg_to_rad(turn), delta * 7.0)
+	_bend.roll = move_toward(_bend.roll, deg_to_rad(_attack_lean("roll")), delta * 14.0)
+	_bend.bow = move_toward(_bend.bow, deg_to_rad(_attack_lean("bow")), delta * 14.0)
 
 
 
@@ -371,7 +442,12 @@ func _action() -> Dictionary:
 	match f.state:
 		Fighter.State.ATTACK:
 			var frame := _attack_frame(f.current_attack, f.attack_time)
-			return {} if frame.is_empty() else { "F": frame }
+			if frame.is_empty():
+				return {}
+			var style: Dictionary = ATTACK_STYLE.get(f.current_attack.name, {})
+			if style.has("legs"):
+				return { "F": _step_frame(f.current_attack, f.attack_time, style.legs), "U": frame }
+			return { "F": frame }
 		Fighter.State.DASH:
 			return _dash_pose()
 		Fighter.State.CHARGE:
@@ -401,18 +477,73 @@ func _action() -> Dictionary:
 
 
 ## Thruster dash: not running — the sword's thrust drags you. Low braced stance held still
-## (feet slide), and for forward dashes the blade is thrust ahead with the thruster behind.
-## The body lean into the dash comes from FighterVisual.
+## (feet slide), the sword held so its bottom-end thruster fires away from the dash
+## (DASH_POSES). The body lean into the dash comes from FighterVisual.
 func _dash_pose() -> Dictionary:
+	var legs := ["gs_jump", _clip_len("gs_jump") * 0.4] if fighter.is_vertical_dash() \
+		else ["gs_block_idle", DASH_STANCE_TIME]  # tucked when rising, else braced
+	return { "F": legs, "U": DASH_POSES[dash_key()].pose }
+
+
+## Which dash pose the current dash uses: "up", or the dash's main direction relative to facing.
+func dash_key() -> String:
 	if fighter.is_vertical_dash():
-		return { "F": ["gs_jump", _clip_len("gs_jump") * 0.4] }  # tucked, rising
-	var pose := { "F": ["gs_block_idle", DASH_STANCE_TIME] }
+		return "up"
 	var local := fighter.global_basis.inverse() * fighter.dash_dir
-	if -local.z > 0.5:
-		pose["U"] = ["spear_stab", DASH_THRUST_TIME]  # forward: blade ahead, thruster behind
-	elif local.z > 0.5:
-		pose["U"] = ["gs_run", DASH_BACK_TIME]  # backward: blade over the shoulder, thruster ahead
-	return pose
+	if absf(local.z) >= absf(local.x):
+		return "forward" if local.z < 0.0 else "back"
+	return "right" if local.x > 0.0 else "left"
+
+
+## Where the blade should point during the current dash (world space).
+func dash_blade_aim() -> Vector3:
+	return (fighter.global_basis * DASH_POSES[dash_key()].aim).normalized()
+
+
+## Hips rotation of a clip at a time (bone space = skeleton space for the root bone).
+func _clip_hips(clip: String, time: float) -> Quaternion:
+	var anim := _player.get_animation(clip)
+	if not _hips_tracks.has(clip):
+		_hips_tracks[clip] = -1
+		for i in anim.get_track_count():
+			var path := anim.track_get_path(i)
+			if anim.track_get_type(i) == Animation.TYPE_ROTATION_3D and path.get_subname(path.get_subname_count() - 1) == SpineBend.ROOT_BONE:
+				_hips_tracks[clip] = i
+	var track: int = _hips_tracks[clip]
+	return anim.rotation_track_interpolate(track, time) if track >= 0 else Quaternion.IDENTITY
+
+
+## Extra waist turn for the current attack (degrees): from its start value (0 unless given)
+## to its end value over the active window, then held.
+func _attack_turn() -> float:
+	var a := fighter.current_attack
+	if fighter.state != Fighter.State.ATTACK or a == null:
+		return 0.0
+	var turn: Variant = ATTACK_STYLE.get(a.name, {}).get("turn", 0.0)
+	var from := 0.0
+	var to := 0.0
+	if turn is Array:
+		from = turn[0]
+		to = turn[1]
+	else:
+		to = turn
+	var t := fighter.attack_time
+	return lerpf(from, to, smoothstep(a.windup, a.windup + a.active, t))  # held after; eased off in _process
+
+
+## Lean or bow (style key, degrees) for the current attack: in place by mid-windup, then held.
+func _attack_lean(key: String) -> float:
+	var a := fighter.current_attack
+	if fighter.state != Fighter.State.ATTACK or a == null:
+		return 0.0
+	var amount: float = ATTACK_STYLE.get(a.name, {}).get(key, 0.0)
+	return amount * smoothstep(0.0, a.windup * 0.5, fighter.attack_time)
+
+
+## Legs for a stepping attack: scrub the step over windup + active, then hold the stance.
+func _step_frame(a: AttackDef, t: float, legs: Array) -> Array:
+	var p := smoothstep(0.0, 1.0, clampf(t / (a.windup + a.active), 0.0, 1.0))
+	return [legs[0], lerpf(legs[1], legs[2], p)]
 
 
 ## Map the attack's windup / active / recovery onto the clip's start -> contact -> end.
@@ -421,8 +552,10 @@ func _attack_frame(a: AttackDef, t: float) -> Array:
 		return []
 	var c: Array = ATTACK_CLIPS[a.name]
 	var start: float = c[1]
-	var c0: float = c[2] - CONTACT_HALF_WIDTH
-	var c1: float = c[2] + CONTACT_HALF_WIDTH
+	var half: float = ATTACK_STYLE.get(a.name, {}).get("contact_half", CONTACT_HALF_WIDTH)
+	var dir := signf(c[3] - c[1])  # -1: played backwards
+	var c0: float = c[2] - half * dir
+	var c1: float = c[2] + half * dir
 	var end: float = c[3]
 	var time: float
 	if t < a.windup:
